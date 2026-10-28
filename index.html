@@ -25,7 +25,6 @@ header h1{font-size:22px;font-weight:300;margin:0;flex:1;letter-spacing:.3px}
 main{padding:16px;max-width:640px;margin:0 auto;padding-bottom:max(24px,env(safe-area-inset-bottom))}
 .hello{margin:4px 0 14px}
 .hello .hi{font-size:28px;font-weight:300;line-height:1.2}
-.hello .time{font-size:17px;font-weight:400;color:var(--muted);margin-top:4px}
 h2{font-size:18px;font-weight:400;margin:22px 0 8px}
 .card{background:var(--card);border-radius:14px;padding:14px 16px;margin-bottom:12px;border-inline-start:5px solid var(--primary);box-shadow:0 1px 3px rgba(0,0,0,.06)}
 .card.urgent{border-inline-start-color:var(--urgent)}
@@ -41,10 +40,20 @@ h2{font-size:18px;font-weight:400;margin:22px 0 8px}
 .chips{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 4px}
 .chip{background:var(--card);color:var(--text);border:1px solid var(--secondary);padding:6px 14px;border-radius:999px;min-height:36px;font-size:14px;font-family:inherit}
 .chip.on{background:var(--primary);color:#fff;border-color:var(--primary)}
-.exp-row{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--card);border-radius:12px;padding:12px 14px;margin-bottom:8px;border-inline-start:4px solid var(--primary)}
+.exp-row{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--card);border-radius:12px;padding:12px 14px;margin-bottom:8px;border-inline-start:4px solid var(--primary);cursor:pointer}
 .exp-row .name{font-weight:500;font-size:15px}
 .exp-row .date{color:var(--muted);font-size:13px;margin-top:2px}
 .exp-row .left{text-align:left;font-size:14px;white-space:nowrap}
+.linkish{background:none;border:0;color:var(--primary);padding:0;min-height:0;font:inherit;text-decoration:underline;cursor:pointer;font-size:14px;margin-top:4px}
+.info-row{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--bg)}
+.info-row:last-child{border-bottom:0}
+.btn{display:inline-flex;align-items:center;justify-content:center;background:var(--primary);color:#fff;text-decoration:none;border-radius:12px;padding:12px 16px;min-height:44px;font-size:15px}
+.btn.light{background:var(--secondary);color:var(--text)}
+.contacts{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin-bottom:12px}
+.contact{display:flex;flex-direction:column;align-items:center;gap:6px;text-decoration:none;color:var(--text);font-size:13px;width:76px}
+.contact .ico{width:58px;height:58px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center}
+.contact .ico svg{width:26px;height:26px;fill:#fff}
+.file-btn{margin-top:12px}
 button{font:inherit;border:0;border-radius:12px;padding:12px 18px;background:var(--primary);color:#fff;cursor:pointer;min-height:44px}
 button.ghost{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.6);padding:8px 12px;min-height:36px}
 button.small{padding:8px 12px;min-height:36px;font-size:14px;background:var(--secondary);color:var(--text)}
@@ -91,6 +100,14 @@ button.small{padding:8px 12px;min-height:36px;font-size:14px;background:var(--se
   </main>
 </section>
 
+<section id="detailView" class="hidden">
+  <header>
+    <button class="ghost" id="backBtn">חזרה</button>
+    <h1>פרטי מסמך</h1>
+  </header>
+  <main id="detailMain"></main>
+</section>
+
 <script>
 /* ===== הגדרות ===== */
 const CONFIG = {
@@ -117,14 +134,22 @@ const TASK_COLS = {
 const DOC_COLS = {
   id: ['מזהה'],
   name: ['שם מסמך'],
+  type: ['סוג'],
   owner: ['בעלים'],
   expiry: ['תאריך תפוגה'],
+  price: ['מחיר חודשי'],
+  provider: ['ספק'],
+  file: ['קישור לקובץ'],
+  phone: ['טלפון ספק'],
+  whatsapp: ['קישור לוואטסאפ'],
+  email: ['מייל ספק'],
+  website: ['אתר ספק'],
   active: ['פעיל'],
 };
 
 const $ = id => document.getElementById(id);
 let tokenClient = null, accessToken = null, tokenExpiresAt = 0, userName = '';
-const state = { tasks: [], docs: [], filter: 'הכל', view: 'open' };
+const state = { tasks: [], docs: [], filter: 'הכל', view: 'open', detailId: null };
 
 /* ===== התחברות ===== */
 function initGis() {
@@ -180,6 +205,7 @@ function greetingTime() {
 
 function showApp() {
   $('loginView').classList.add('hidden');
+  $('detailView').classList.add('hidden');
   $('appView').classList.remove('hidden');
   $('greeting').textContent = `${greetingTime()} ${userName}`;
 }
@@ -190,10 +216,12 @@ function logout() {
   tokenExpiresAt = 0;
   state.tasks = [];
   state.docs = [];
+  state.detailId = null;
   $('tasks').innerHTML = '';
   $('expiring').innerHTML = '';
   $('filters').innerHTML = '';
   $('status').textContent = '';
+  $('detailView').classList.add('hidden');
   $('appView').classList.add('hidden');
   $('loginView').classList.remove('hidden');
   $('loginError').classList.add('hidden');
@@ -288,9 +316,17 @@ function parseDocs(rows) {
     docs.push({
       id,
       name: get(row, c.name) || 'מסמך',
+      type: get(row, c.type),
       owner: get(row, c.owner),
       expiry: parseDate(get(row, c.expiry)),
       expiryStr: get(row, c.expiry),
+      price: get(row, c.price),
+      provider: get(row, c.provider),
+      file: get(row, c.file),
+      phone: get(row, c.phone),
+      whatsapp: get(row, c.whatsapp),
+      email: get(row, c.email),
+      website: get(row, c.website),
       active: get(row, c.active) !== 'FALSE',
     });
   }
@@ -320,6 +356,7 @@ function parseTasks(rows, docs) {
       status: status || 'פתוחה',
       title: get(row, c.title) || doc || 'משימה',
       doc,
+      docId,
       dueStr,
       due: parseDate(dueStr),
       urgent: key.includes('|דחוף'),
@@ -425,7 +462,11 @@ function taskCard(t, isDone) {
   if (t.due) top.append(el('span', 'muted', daysText(t.due)));
   else if (t.dueStr) top.append(el('span', 'muted', t.dueStr));
   body.append(top, el('div', 'title', t.title));
-  if (t.doc && t.doc !== t.title) body.append(el('div', 'muted', t.doc));
+  if (t.doc && t.doc !== t.title) {
+    const docBtn = el('button', 'linkish', t.doc);
+    docBtn.onclick = () => openDoc(t.docId);
+    body.append(docBtn);
+  }
 
   if (isDone) {
     const undo = el('button', 'small', 'החזרה לפתוחה');
@@ -446,18 +487,24 @@ async function setStatus(t, value) {
 }
 
 function showStatusError(e) {
-  $('status').textContent = e.message === 'AUTH'
+  const msg = e.message === 'AUTH'
     ? 'צריך להתחבר מחדש. לחצי על יציאה והתחברי שוב.'
     : e.message === 'NOCOL'
       ? 'לא נמצאה עמודת סטטוס בטאב המשימות.'
       : 'לא הצלחתי לעדכן את המשימה. נסי שוב.';
+  $('status').textContent = msg;
+}
+
+function afterTaskChange() {
+  if (state.detailId) renderDetail(state.detailId);
+  else renderTasks();
 }
 
 async function markDone(t, box) {
   box.disabled = true;
   try {
     await setStatus(t, 'בוצעה');
-    renderTasks();
+    afterTaskChange();
   } catch (e) {
     box.checked = false;
     box.disabled = false;
@@ -469,7 +516,7 @@ async function reopen(t, btn) {
   btn.disabled = true;
   try {
     await setStatus(t, 'פתוחה');
-    renderTasks();
+    afterTaskChange();
   } catch (e) {
     btn.disabled = false;
     showStatusError(e);
@@ -494,8 +541,116 @@ function renderExpiring() {
     const right = el('div', '');
     right.append(el('div', 'name', d.name), el('div', 'date', d.expiryStr));
     row.append(right, el('div', 'left muted', daysText(d.expiry)));
+    row.onclick = () => openDoc(d.id);
     box.append(row);
   }
+}
+
+/* ===== מסך פרטי מסמך ===== */
+function openDoc(id) {
+  state.detailId = id;
+  $('appView').classList.add('hidden');
+  $('detailView').classList.remove('hidden');
+  renderDetail(id);
+  window.scrollTo(0, 0);
+}
+
+function closeDoc() {
+  state.detailId = null;
+  $('detailView').classList.add('hidden');
+  $('appView').classList.remove('hidden');
+  window.scrollTo(0, 0);
+}
+
+function linkBtn(text, href, light, external) {
+  const a = el('a', 'btn' + (light ? ' light' : ''), text);
+  a.href = href;
+  if (external) {
+    a.target = '_blank';
+    a.rel = 'noopener';
+  }
+  return a;
+}
+
+const ICON_PATHS = {
+  phone: 'M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z',
+  whatsapp: 'M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z',
+  mail: 'M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z',
+  globe: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z',
+};
+
+function contactBtn(icon, label, href, external) {
+  const a = el('a', 'contact');
+  a.href = href;
+  if (external) {
+    a.target = '_blank';
+    a.rel = 'noopener';
+  }
+  const ico = el('span', 'ico');
+  ico.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${ICON_PATHS[icon]}"/></svg>`;
+  a.append(ico);
+  a.title = label;
+  a.setAttribute('aria-label', label);
+  return a;
+}
+
+function infoRow(parent, label, value) {
+  const row = el('div', 'info-row');
+  row.append(el('span', 'muted', label), el('span', '', value));
+  parent.append(row);
+}
+
+function intlPhone(p) {
+  const digits = p.replace(/\D/g, '');
+  return digits.startsWith('0') ? '972' + digits.slice(1) : digits;
+}
+
+function renderDetail(id) {
+  const d = state.docs.find(x => x.id === id);
+  if (!d) { closeDoc(); return; }
+  const box = $('detailMain');
+  box.innerHTML = '';
+
+  const card = el('div', 'card');
+  card.append(el('div', 'title', d.name));
+  if (d.type) card.append(el('div', 'muted', d.type));
+
+  const info = el('div', '');
+  infoRow(info, 'תאריך תפוגה', d.expiryStr ? `${d.expiryStr}${d.expiry ? ' (' + daysText(d.expiry) + ')' : ''}` : 'לא הוגדר');
+  infoRow(info, 'בעלים', d.owner || 'לא הוגדר');
+  if (d.provider) infoRow(info, 'ספק', d.provider);
+  if (d.price) infoRow(info, 'מחיר חודשי', d.price);
+  card.append(info);
+
+  if (d.file) {
+    const f = linkBtn('פתיחת הקובץ', d.file, true, true);
+    f.classList.add('file-btn');
+    card.append(f);
+  }
+  box.append(card);
+
+  const contacts = [];
+  if (d.phone) contacts.push(contactBtn('phone', 'חיוג', 'tel:' + d.phone.replace(/[\s-]/g, ''), false));
+  const wa = d.whatsapp || (d.phone ? 'https://wa.me/' + intlPhone(d.phone) : '');
+  if (wa) contacts.push(contactBtn('whatsapp', 'וואטסאפ', wa, true));
+  if (d.email) contacts.push(contactBtn('mail', 'מייל', `mailto:${d.email}?subject=${encodeURIComponent('פנייה בנוגע ל' + d.name)}`, false));
+  if (d.website) contacts.push(contactBtn('globe', 'אתר הספק', /^https?:\/\//.test(d.website) ? d.website : 'https://' + d.website, true));
+  if (contacts.length) {
+    box.append(el('h2', '', 'יצירת קשר עם הספק'));
+    const c = el('div', 'contacts');
+    contacts.forEach(x => c.append(x));
+    box.append(c);
+  }
+
+  box.append(el('h2', '', 'משימות של המסמך'));
+  const related = state.tasks
+    .filter(t => t.docId === d.id)
+    .sort((a, b) => (a.status === 'בוצעה') - (b.status === 'בוצעה'));
+  if (!related.length) {
+    box.append(el('p', 'muted', 'אין משימות למסמך הזה.'));
+    return;
+  }
+  for (const t of related) box.append(taskCard(t, t.status === 'בוצעה'));
 }
 
 /* ===== כפתורים ===== */
@@ -506,6 +661,7 @@ $('refreshBtn').onclick = () => {
 $('logoutBtn').onclick = logout;
 $('tabOpen').onclick = () => setView('open');
 $('tabDone').onclick = () => setView('done');
+$('backBtn').onclick = closeDoc;
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js');
