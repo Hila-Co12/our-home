@@ -16,11 +16,11 @@
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#1b2321;--card:#243029;--text:#e8efec;--muted:#9fb3ad}}
 :root[data-theme="dark"]{--bg:#1b2321;--card:#243029;--text:#e8efec;--muted:#9fb3ad}
 *{box-sizing:border-box}
-body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--text);background:var(--bg);min-height:100vh}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
 header{position:sticky;top:0;z-index:1;background:var(--primary);color:#fff;display:flex;align-items:center;gap:8px;padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top))}
 header h1{font-size:20px;margin:0;flex:1}
 main{padding:16px;max-width:640px;margin:0 auto;padding-bottom:max(24px,env(safe-area-inset-bottom))}
-h2{font-size:18px;margin:8px 0}
+h2{font-size:18px;margin:18px 0 8px}
 .card{background:var(--card);border-radius:14px;padding:14px 16px;margin-bottom:12px;border-inline-start:5px solid var(--primary);box-shadow:0 1px 3px rgba(0,0,0,.06)}
 .card.urgent{border-inline-start-color:var(--urgent)}
 .card .title{font-size:16px;font-weight:600;margin:8px 0 2px}
@@ -28,6 +28,15 @@ h2{font-size:18px;margin:8px 0}
 .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:13px;font-weight:600;background:var(--secondary);color:var(--text)}
 .badge.urgent{background:var(--urgent);color:#fff}
 .muted{color:var(--muted);font-size:14px}
+.done{display:flex;gap:10px;align-items:flex-start}
+.done input{width:22px;height:22px;margin-top:4px;accent-color:var(--primary);flex:0 0 auto}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 4px}
+.chip{background:var(--card);color:var(--text);border:1px solid var(--secondary);padding:6px 14px;border-radius:999px;min-height:36px;font-size:14px}
+.chip.on{background:var(--primary);color:#fff;border-color:var(--primary)}
+.hscroll{display:flex;gap:10px;overflow-x:auto;padding-bottom:8px}
+.mini{min-width:170px;background:var(--card);border-radius:12px;padding:10px 12px;border-inline-start:4px solid var(--primary);flex:0 0 auto}
+.mini.urgent{border-inline-start-color:var(--urgent)}
+.mini .name{font-weight:600;font-size:15px;margin-bottom:4px}
 button{font:inherit;border:0;border-radius:12px;padding:12px 18px;background:var(--primary);color:#fff;cursor:pointer;min-height:44px}
 button.ghost{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.6);padding:8px 12px;min-height:36px}
 .login{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;gap:14px}
@@ -43,7 +52,7 @@ button.ghost{background:transparent;color:#fff;border:1px solid rgba(255,255,255
   <img src="icon-512.png" alt="">
   <h1>הבית שלנו</h1>
   <p class="muted">מסמכים, תוקפים ומשימות במקום אחד</p>
-  <button id="loginBtn">כניסה עם Google</button>
+  <button id="loginBtn">היכנסו עם Google</button>
   <p id="loginError" class="error hidden"></p>
 </section>
 
@@ -55,9 +64,14 @@ button.ghost{background:transparent;color:#fff;border:1px solid rgba(255,255,255
   </header>
   <main>
     <p class="muted" id="greeting"></p>
+
     <h2>משימות פתוחות</h2>
+    <div id="filters" class="chips"></div>
     <div id="status" class="muted"></div>
     <div id="tasks"></div>
+
+    <h2>פג בקרוב</h2>
+    <div id="expiring" class="hscroll"></div>
   </main>
 </section>
 
@@ -69,20 +83,31 @@ const CONFIG = {
   // מייל -> שם תצוגה. רק המיילים האלה יכולים להיכנס לאפליקציה
   allowedEmails: { 'hila1993@gmail.com': 'הילה' },
   tasksTab: 'משימות',
+  docsTab: 'מסמכים',
+  owners: ['הכל', 'הילה', 'שי', 'משותף'],
+  maxTasks: 5,
 };
 const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.email';
 
-/* שמות העמודות בטאב "משימות" - האפליקציה מחפשת את השם הראשון שנמצא */
-const COLS = {
-  title: ['משימה', 'כותרת', 'תיאור', 'נושא'],
+/* שמות העמודות - האפליקציה מחפשת את השם הראשון שנמצא */
+const TASK_COLS = {
+  title: ['כותרת', 'משימה', 'תיאור', 'נושא'],
   doc: ['מסמך', 'שם המסמך', 'שם מסמך'],
   due: ['תאריך יעד', 'תאריך', 'יעד'],
   status: ['סטטוס'],
   key: ['מפתח'],
 };
+const DOC_COLS = {
+  id: ['מזהה'],
+  name: ['שם מסמך'],
+  owner: ['בעלים'],
+  expiry: ['תאריך תפוגה'],
+  active: ['פעיל'],
+};
 
 const $ = id => document.getElementById(id);
 let tokenClient = null, accessToken = null, tokenExpiresAt = 0, userName = '';
+const state = { tasks: [], docs: [], filter: 'הכל' };
 
 /* ===== התחברות ===== */
 function initGis() {
@@ -115,12 +140,12 @@ async function onToken(resp) {
   if (!allowed) {
     google.accounts.oauth2.revoke(accessToken, () => {});
     accessToken = null;
-    showLoginError('החשבון הזה אינו מורשה לגשת לאפליקציה.');
+    showLoginError('אין לך הרשאה לגשת לאפליקציה הזו.');
     return;
   }
   userName = CONFIG.allowedEmails[allowed];
   showApp();
-  loadTasks();
+  loadAll();
 }
 
 function showLoginError(msg) {
@@ -132,31 +157,47 @@ function showLoginError(msg) {
 function showApp() {
   $('loginView').classList.add('hidden');
   $('appView').classList.remove('hidden');
-  $('greeting').textContent = `היי ${userName}`;
+  $('greeting').textContent = `שלום ${userName}`;
 }
 
 function logout() {
   if (accessToken) google.accounts.oauth2.revoke(accessToken, () => {});
   accessToken = null;
   tokenExpiresAt = 0;
+  state.tasks = [];
+  state.docs = [];
   $('tasks').innerHTML = '';
+  $('expiring').innerHTML = '';
+  $('filters').innerHTML = '';
   $('status').textContent = '';
   $('appView').classList.add('hidden');
   $('loginView').classList.remove('hidden');
   $('loginError').classList.add('hidden');
 }
 
-/* ===== קריאה מהגיליון ===== */
+/* ===== גישה לגיליון ===== */
+function sheetUrl(path) {
+  return `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.sheetId}/${path}`;
+}
+
 async function sheetsGet(path) {
-  const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.sheetId}/${path}`, {
-    headers: { Authorization: 'Bearer ' + accessToken },
-  });
+  const r = await fetch(sheetUrl(path), { headers: { Authorization: 'Bearer ' + accessToken } });
   if (r.status === 401 || r.status === 403) throw new Error('AUTH');
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }
 
-async function loadTasks() {
+async function sheetsWrite(range, value) {
+  const r = await fetch(sheetUrl(`values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`), {
+    method: 'PUT',
+    headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ values: [[value]] }),
+  });
+  if (r.status === 401 || r.status === 403) throw new Error('AUTH');
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+}
+
+async function loadAll() {
   if (CONFIG.sheetId.startsWith('PASTE')) {
     $('status').textContent = 'חסר מזהה גיליון בקובץ ההגדרות.';
     return;
@@ -167,8 +208,15 @@ async function loadTasks() {
   }
   $('status').textContent = 'טוען...';
   try {
-    const data = await sheetsGet(`values/${encodeURIComponent(CONFIG.tasksTab)}?valueRenderOption=FORMATTED_VALUE`);
-    renderTasks(parseTasks(data.values || []));
+    const [tasksData, docsData] = await Promise.all([
+      sheetsGet(`values/${encodeURIComponent(CONFIG.tasksTab)}?valueRenderOption=FORMATTED_VALUE`),
+      sheetsGet(`values/${encodeURIComponent(CONFIG.docsTab)}?valueRenderOption=FORMATTED_VALUE`),
+    ]);
+    state.docs = parseDocs(docsData.values || []);
+    state.tasks = parseTasks(tasksData.values || [], state.docs);
+    renderFilters();
+    renderTasks();
+    renderExpiring();
   } catch (e) {
     $('status').textContent = e.message === 'AUTH'
       ? 'צריך להתחבר מחדש. לחצי על יציאה והתחברי שוב.'
@@ -176,12 +224,17 @@ async function loadTasks() {
   }
 }
 
+/* ===== עיבוד נתונים ===== */
 function findCol(header, names) {
   for (const n of names) {
     const i = header.indexOf(n);
     if (i >= 0) return i;
   }
   return -1;
+}
+
+function colLetter(i) {
+  return String.fromCharCode(65 + i);
 }
 
 function parseDate(s) {
@@ -197,29 +250,58 @@ function parseDate(s) {
   return null;
 }
 
-function parseTasks(rows) {
+function parseDocs(rows) {
   if (rows.length < 2) return [];
   const header = rows[0].map(h => String(h).trim());
   const c = {};
-  for (const k in COLS) c[k] = findCol(header, COLS[k]);
+  for (const k in DOC_COLS) c[k] = findCol(header, DOC_COLS[k]);
+  const get = (row, i) => (i >= 0 && row[i] != null) ? String(row[i]).trim() : '';
+
+  const docs = [];
+  for (const row of rows.slice(1)) {
+    const id = get(row, c.id);
+    if (!id) continue;
+    docs.push({
+      id,
+      name: get(row, c.name) || 'מסמך',
+      owner: get(row, c.owner),
+      expiry: parseDate(get(row, c.expiry)),
+      expiryStr: get(row, c.expiry),
+      active: get(row, c.active) !== 'FALSE',
+    });
+  }
+  return docs;
+}
+
+function parseTasks(rows, docs) {
+  if (rows.length < 2) return [];
+  const header = rows[0].map(h => String(h).trim());
+  const c = {};
+  for (const k in TASK_COLS) c[k] = findCol(header, TASK_COLS[k]);
+  const docById = Object.fromEntries(docs.map(d => [d.id, d]));
+  const get = (row, i) => (i >= 0 && row[i] != null) ? String(row[i]).trim() : '';
 
   const tasks = [];
-  for (const row of rows.slice(1)) {
-    const get = i => (i >= 0 && row[i] != null) ? String(row[i]).trim() : '';
-    const status = get(c.status);
-    if (status === 'בוצעה' || status === 'הועבר לדחופה') continue;
+  rows.forEach((row, index) => {
+    if (index === 0) return;
+    const status = get(row, c.status);
+    if (status === 'בוצעה' || status === 'הועבר לדחופה') return;
 
-    const key = get(c.key);
-    const doc = get(c.doc);
-    const dueStr = get(c.due);
+    const key = get(row, c.key);
+    const docId = key.split('|')[0];
+    const doc = get(row, c.doc);
+    const dueStr = get(row, c.due);
     tasks.push({
-      title: get(c.title) || doc || 'משימה',
+      sheetRow: index + 1,
+      title: get(row, c.title) || doc || 'משימה',
       doc,
       dueStr,
       due: parseDate(dueStr),
       urgent: key.includes('|דחוף'),
+      owner: docById[docId] ? docById[docId].owner : '',
+      statusCol: c.status,
     });
-  }
+  });
   return tasks;
 }
 
@@ -231,47 +313,132 @@ function el(tag, cls, text) {
   return n;
 }
 
-function renderTasks(tasks) {
-  tasks.sort((a, b) => {
-    if (a.urgent !== b.urgent) return a.urgent ? -1 : 1;
-    const da = a.due ? a.due.getTime() : Infinity;
-    const db = b.due ? b.due.getTime() : Infinity;
-    return da - db;
-  });
+function startOfToday() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
 
+function daysText(due) {
+  const days = Math.round((due - startOfToday()) / 86400000);
+  if (days < 0) return `עבר לפני ${-days} ימים`;
+  if (days === 0) return 'היום';
+  return `בעוד ${days} ימים`;
+}
+
+function renderFilters() {
+  const box = $('filters');
+  box.innerHTML = '';
+  for (const owner of CONFIG.owners) {
+    const b = el('button', 'chip' + (state.filter === owner ? ' on' : ''), owner);
+    b.onclick = () => { state.filter = owner; renderFilters(); renderTasks(); };
+    box.append(b);
+  }
+}
+
+function renderTasks() {
   const box = $('tasks');
   box.innerHTML = '';
-  if (!tasks.length) {
-    $('status').textContent = 'אין משימות פתוחות';
+
+  if (!state.tasks.length) {
+    $('status').textContent = 'אין משימות פתוחות. הכול מסודר!';
     return;
   }
-  $('status').textContent = `${tasks.length} משימות פתוחות`;
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const list = state.tasks
+    .filter(t => state.filter === 'הכל' || t.owner === state.filter)
+    .sort((a, b) => {
+      if (a.urgent !== b.urgent) return a.urgent ? -1 : 1;
+      const da = a.due ? a.due.getTime() : Infinity;
+      const db = b.due ? b.due.getTime() : Infinity;
+      return da - db;
+    });
 
-  for (const t of tasks) {
-    const card = el('div', 'card' + (t.urgent ? ' urgent' : ''));
-    const top = el('div', 'row');
-    top.append(el('span', 'badge' + (t.urgent ? ' urgent' : ''), t.urgent ? 'דחוף' : 'לטיפול'));
-    if (t.due) {
-      const days = Math.round((t.due - today) / 86400000);
-      const text = days < 0 ? `עבר לפני ${-days} ימים`
-        : days === 0 ? 'היום'
-        : `בעוד ${days} ימים`;
-      top.append(el('span', 'muted', text));
-    } else if (t.dueStr) {
-      top.append(el('span', 'muted', t.dueStr));
-    }
-    card.append(top, el('div', 'title', t.title));
-    if (t.doc && t.doc !== t.title) card.append(el('div', 'muted', t.doc));
-    box.append(card);
+  if (!list.length) {
+    $('status').textContent = 'אין משימות פתוחות למסנן הזה.';
+    return;
+  }
+
+  const shown = list.slice(0, CONFIG.maxTasks);
+  const more = list.length - shown.length;
+  $('status').textContent = more > 0
+    ? `מוצגות ${shown.length} מתוך ${list.length} משימות פתוחות`
+    : `${list.length} משימות פתוחות`;
+
+  for (const t of shown) box.append(taskCard(t));
+  if (more > 0) box.append(el('p', 'muted', `ועוד ${more} משימות`));
+}
+
+function taskCard(t) {
+  const level = t.urgent ? 'urgent' : '';
+  const card = el('div', 'card ' + level);
+
+  const label = el('label', 'done');
+  const box = el('input');
+  box.type = 'checkbox';
+  box.setAttribute('aria-label', 'סמני כבוצעה');
+  box.onchange = () => markDone(t, card, box);
+  label.append(box);
+
+  const body = el('div', '');
+  const top = el('div', 'row');
+  const badgeText = t.urgent ? 'דחוף' : 'לטיפול';
+  top.append(el('span', 'badge ' + level, badgeText));
+  if (t.due) top.append(el('span', 'muted', daysText(t.due)));
+  else if (t.dueStr) top.append(el('span', 'muted', t.dueStr));
+  body.append(top, el('div', 'title', t.title));
+  if (t.doc && t.doc !== t.title) body.append(el('div', 'muted', t.doc));
+
+  label.append(body);
+  card.append(label);
+  return card;
+}
+
+async function markDone(t, card, box) {
+  if (t.statusCol < 0) {
+    $('status').textContent = 'לא נמצאה עמודת סטטוס בטאב המשימות.';
+    box.checked = false;
+    return;
+  }
+  box.disabled = true;
+  try {
+    await sheetsWrite(`'${CONFIG.tasksTab}'!${colLetter(t.statusCol)}${t.sheetRow}`, 'בוצעה');
+    state.tasks = state.tasks.filter(x => x !== t);
+    card.remove();
+    renderTasks();
+  } catch (e) {
+    box.checked = false;
+    box.disabled = false;
+    $('status').textContent = e.message === 'AUTH'
+      ? 'צריך להתחבר מחדש. לחצי על יציאה והתחברי שוב.'
+      : 'לא הצלחתי לסמן את המשימה. נסי שוב.';
+  }
+}
+
+function renderExpiring() {
+  const box = $('expiring');
+  box.innerHTML = '';
+  const today = startOfToday();
+  const upcoming = state.docs
+    .filter(d => d.active && d.expiry && d.expiry >= today)
+    .sort((a, b) => a.expiry - b.expiry)
+    .slice(0, 6);
+
+  if (!upcoming.length) {
+    box.append(el('p', 'muted', 'אין מסמכים שפגים בקרוב.'));
+    return;
+  }
+  for (const d of upcoming) {
+    const item = el('div', 'mini');
+    item.append(el('div', 'name', d.name));
+    item.append(el('div', 'muted', daysText(d.expiry)));
+    box.append(item);
   }
 }
 
 /* ===== כפתורים ===== */
 $('refreshBtn').onclick = () => {
-  if (accessToken && Date.now() < tokenExpiresAt) loadTasks();
+  if (accessToken && Date.now() < tokenExpiresAt) loadAll();
   else tokenClient.requestAccessToken({ prompt: '' });
 };
 $('logoutBtn').onclick = logout;
