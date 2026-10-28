@@ -10,40 +10,49 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500&display=swap" rel="stylesheet">
 <title>הבית שלנו</title>
 <style>
 :root{--primary:#3E6B6B;--secondary:#A7C4BC;--urgent:#B83A2E;--bg:#F4F7F5;--card:#FFFFFF;--text:#24302E;--muted:#6B7A76}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#1b2321;--card:#243029;--text:#e8efec;--muted:#9fb3ad}}
 :root[data-theme="dark"]{--bg:#1b2321;--card:#243029;--text:#e8efec;--muted:#9fb3ad}
 *{box-sizing:border-box}
-body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
-header{position:sticky;top:0;z-index:1;background:var(--primary);color:#fff;display:flex;align-items:center;gap:8px;padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top))}
-header h1{font-size:20px;margin:0;flex:1}
+body{margin:0;font-family:Heebo,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;font-weight:400;background:var(--bg);color:var(--text);min-height:100vh}
+header{position:sticky;top:0;z-index:1;background:var(--primary);color:#fff;display:flex;align-items:center;gap:10px;padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top))}
+header .logo{width:36px;height:36px;border-radius:10px;background:#fff;flex:0 0 auto}
+header h1{font-size:22px;font-weight:300;margin:0;flex:1;letter-spacing:.3px}
 main{padding:16px;max-width:640px;margin:0 auto;padding-bottom:max(24px,env(safe-area-inset-bottom))}
-h2{font-size:18px;margin:18px 0 8px}
+.hello{margin:4px 0 14px}
+.hello .hi{font-size:28px;font-weight:300;line-height:1.2}
+.hello .time{font-size:17px;font-weight:400;color:var(--muted);margin-top:4px}
+h2{font-size:18px;font-weight:400;margin:22px 0 8px}
 .card{background:var(--card);border-radius:14px;padding:14px 16px;margin-bottom:12px;border-inline-start:5px solid var(--primary);box-shadow:0 1px 3px rgba(0,0,0,.06)}
 .card.urgent{border-inline-start-color:var(--urgent)}
-.card .title{font-size:16px;font-weight:600;margin:8px 0 2px}
+.card .title{font-size:16px;font-weight:500;margin:8px 0 2px}
+.card.done-card{opacity:.85}
 .row{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
-.badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:13px;font-weight:600;background:var(--secondary);color:var(--text)}
+.badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:13px;font-weight:500;background:var(--secondary);color:var(--text)}
 .badge.urgent{background:var(--urgent);color:#fff}
 .muted{color:var(--muted);font-size:14px}
-.done{display:flex;gap:10px;align-items:flex-start}
-.done input{width:22px;height:22px;margin-top:4px;accent-color:var(--primary);flex:0 0 auto}
+.pick{display:flex;gap:12px;align-items:flex-start}
+.pick input{width:22px;height:22px;margin-top:4px;accent-color:var(--primary);flex:0 0 auto;cursor:pointer}
+.body{flex:1;min-width:0}
 .chips{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 4px}
-.chip{background:var(--card);color:var(--text);border:1px solid var(--secondary);padding:6px 14px;border-radius:999px;min-height:36px;font-size:14px}
+.chip{background:var(--card);color:var(--text);border:1px solid var(--secondary);padding:6px 14px;border-radius:999px;min-height:36px;font-size:14px;font-family:inherit}
 .chip.on{background:var(--primary);color:#fff;border-color:var(--primary)}
-.hscroll{display:flex;gap:10px;overflow-x:auto;padding-bottom:8px}
-.mini{min-width:170px;background:var(--card);border-radius:12px;padding:10px 12px;border-inline-start:4px solid var(--primary);flex:0 0 auto}
-.mini.urgent{border-inline-start-color:var(--urgent)}
-.mini .name{font-weight:600;font-size:15px;margin-bottom:4px}
+.exp-row{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--card);border-radius:12px;padding:12px 14px;margin-bottom:8px;border-inline-start:4px solid var(--primary)}
+.exp-row .name{font-weight:500;font-size:15px}
+.exp-row .date{color:var(--muted);font-size:13px;margin-top:2px}
+.exp-row .left{text-align:left;font-size:14px;white-space:nowrap}
 button{font:inherit;border:0;border-radius:12px;padding:12px 18px;background:var(--primary);color:#fff;cursor:pointer;min-height:44px}
 button.ghost{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.6);padding:8px 12px;min-height:36px}
+button.small{padding:8px 12px;min-height:36px;font-size:14px;background:var(--secondary);color:var(--text)}
 .login{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;gap:14px}
 .login img{width:120px;height:120px;border-radius:24px}
-.login h1{margin:0}
+.login h1{margin:0;font-weight:300}
 .hidden{display:none !important}
-.error{color:var(--urgent);font-weight:600}
+.error{color:var(--urgent);font-weight:500}
 </style>
 </head>
 <body>
@@ -58,20 +67,28 @@ button.ghost{background:transparent;color:#fff;border:1px solid rgba(255,255,255
 
 <section id="appView" class="hidden">
   <header>
+    <img class="logo" src="icon-192.png" alt="">
     <h1>הבית שלנו</h1>
     <button class="ghost" id="refreshBtn">רענון</button>
     <button class="ghost" id="logoutBtn">יציאה</button>
   </header>
   <main>
-    <p class="muted" id="greeting"></p>
+    <div class="hello">
+      <div class="hi" id="greeting"></div>
+      <div class="time" id="timeGreet"></div>
+    </div>
 
-    <h2>משימות פתוחות</h2>
+    <h2>משימות</h2>
+    <div class="chips">
+      <button class="chip on" id="tabOpen">משימות פתוחות</button>
+      <button class="chip" id="tabDone">משימות שטופלו</button>
+    </div>
     <div id="filters" class="chips"></div>
     <div id="status" class="muted"></div>
     <div id="tasks"></div>
 
     <h2>פג בקרוב</h2>
-    <div id="expiring" class="hscroll"></div>
+    <div id="expiring"></div>
   </main>
 </section>
 
@@ -86,6 +103,7 @@ const CONFIG = {
   docsTab: 'מסמכים',
   owners: ['הכל', 'הילה', 'שי', 'משותף'],
   maxTasks: 5,
+  maxExpiring: 8,
 };
 const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.email';
 
@@ -107,7 +125,7 @@ const DOC_COLS = {
 
 const $ = id => document.getElementById(id);
 let tokenClient = null, accessToken = null, tokenExpiresAt = 0, userName = '';
-const state = { tasks: [], docs: [], filter: 'הכל' };
+const state = { tasks: [], docs: [], filter: 'הכל', view: 'open' };
 
 /* ===== התחברות ===== */
 function initGis() {
@@ -154,10 +172,18 @@ function showLoginError(msg) {
   e.classList.remove('hidden');
 }
 
+function greetingTime() {
+  const h = new Date().getHours();
+  if (h >= 5 && h < 12) return 'בוקר טוב';
+  if (h >= 12 && h < 17) return 'צהריים טובים';
+  return 'ערב טוב';
+}
+
 function showApp() {
   $('loginView').classList.add('hidden');
   $('appView').classList.remove('hidden');
-  $('greeting').textContent = `שלום ${userName}`;
+  $('greeting').textContent = `היי ${userName}`;
+  $('timeGreet').textContent = greetingTime();
 }
 
 function logout() {
@@ -285,7 +311,7 @@ function parseTasks(rows, docs) {
   rows.forEach((row, index) => {
     if (index === 0) return;
     const status = get(row, c.status);
-    if (status === 'בוצעה' || status === 'הועבר לדחופה') return;
+    if (status === 'הועבר לדחופה') return;
 
     const key = get(row, c.key);
     const docId = key.split('|')[0];
@@ -293,6 +319,7 @@ function parseTasks(rows, docs) {
     const dueStr = get(row, c.due);
     tasks.push({
       sheetRow: index + 1,
+      status: status || 'פתוחה',
       title: get(row, c.title) || doc || 'משימה',
       doc,
       dueStr,
@@ -326,6 +353,13 @@ function daysText(due) {
   return `בעוד ${days} ימים`;
 }
 
+function setView(v) {
+  state.view = v;
+  $('tabOpen').classList.toggle('on', v === 'open');
+  $('tabDone').classList.toggle('on', v === 'done');
+  renderTasks();
+}
+
 function renderFilters() {
   const box = $('filters');
   box.innerHTML = '';
@@ -339,13 +373,15 @@ function renderFilters() {
 function renderTasks() {
   const box = $('tasks');
   box.innerHTML = '';
+  const isDone = state.view === 'done';
 
-  if (!state.tasks.length) {
-    $('status').textContent = 'אין משימות פתוחות. הכול מסודר!';
+  const inView = state.tasks.filter(t => (t.status === 'בוצעה') === isDone);
+  if (!inView.length) {
+    $('status').textContent = isDone ? 'אין משימות שטופלו עדיין.' : 'אין משימות פתוחות. הכול מסודר!';
     return;
   }
 
-  const list = state.tasks
+  const list = inView
     .filter(t => state.filter === 'הכל' || t.owner === state.filter)
     .sort((a, b) => {
       if (a.urgent !== b.urgent) return a.urgent ? -1 : 1;
@@ -355,63 +391,90 @@ function renderTasks() {
     });
 
   if (!list.length) {
-    $('status').textContent = 'אין משימות פתוחות למסנן הזה.';
+    $('status').textContent = 'אין משימות למסנן הזה.';
     return;
   }
 
-  const shown = list.slice(0, CONFIG.maxTasks);
+  const shown = isDone ? list : list.slice(0, CONFIG.maxTasks);
   const more = list.length - shown.length;
   $('status').textContent = more > 0
     ? `מוצגות ${shown.length} מתוך ${list.length} משימות פתוחות`
-    : `${list.length} משימות פתוחות`;
+    : `${list.length} ${isDone ? 'משימות שטופלו' : 'משימות פתוחות'}`;
 
-  for (const t of shown) box.append(taskCard(t));
+  for (const t of shown) box.append(taskCard(t, isDone));
   if (more > 0) box.append(el('p', 'muted', `ועוד ${more} משימות`));
 }
 
-function taskCard(t) {
-  const level = t.urgent ? 'urgent' : '';
-  const card = el('div', 'card ' + level);
+function taskCard(t, isDone) {
+  const card = el('div', 'card' + (t.urgent && !isDone ? ' urgent' : '') + (isDone ? ' done-card' : ''));
+  const pick = el('div', 'pick');
 
-  const label = el('label', 'done');
-  const box = el('input');
-  box.type = 'checkbox';
-  box.setAttribute('aria-label', 'סמני כבוצעה');
-  box.onchange = () => markDone(t, card, box);
-  label.append(box);
+  if (!isDone) {
+    const box = el('input');
+    box.type = 'checkbox';
+    box.setAttribute('aria-label', 'סמני כבוצעה');
+    box.onchange = () => markDone(t, box);
+    pick.append(box);
+  }
 
-  const body = el('div', '');
+  const body = el('div', 'body');
   const top = el('div', 'row');
-  const badgeText = t.urgent ? 'דחוף' : 'לטיפול';
-  top.append(el('span', 'badge ' + level, badgeText));
+  if (isDone) {
+    top.append(el('span', 'badge', 'טופלה'));
+  } else {
+    top.append(el('span', 'badge' + (t.urgent ? ' urgent' : ''), t.urgent ? 'דחוף' : 'לטיפול'));
+  }
   if (t.due) top.append(el('span', 'muted', daysText(t.due)));
   else if (t.dueStr) top.append(el('span', 'muted', t.dueStr));
   body.append(top, el('div', 'title', t.title));
   if (t.doc && t.doc !== t.title) body.append(el('div', 'muted', t.doc));
 
-  label.append(body);
-  card.append(label);
+  if (isDone) {
+    const undo = el('button', 'small', 'החזרה לפתוחה');
+    undo.style.marginTop = '10px';
+    undo.onclick = () => reopen(t, undo);
+    body.append(undo);
+  }
+
+  pick.append(body);
+  card.append(pick);
   return card;
 }
 
-async function markDone(t, card, box) {
-  if (t.statusCol < 0) {
-    $('status').textContent = 'לא נמצאה עמודת סטטוס בטאב המשימות.';
-    box.checked = false;
-    return;
-  }
+async function setStatus(t, value) {
+  if (t.statusCol < 0) throw new Error('NOCOL');
+  await sheetsWrite(`'${CONFIG.tasksTab}'!${colLetter(t.statusCol)}${t.sheetRow}`, value);
+  t.status = value;
+}
+
+function showStatusError(e) {
+  $('status').textContent = e.message === 'AUTH'
+    ? 'צריך להתחבר מחדש. לחצי על יציאה והתחברי שוב.'
+    : e.message === 'NOCOL'
+      ? 'לא נמצאה עמודת סטטוס בטאב המשימות.'
+      : 'לא הצלחתי לעדכן את המשימה. נסי שוב.';
+}
+
+async function markDone(t, box) {
   box.disabled = true;
   try {
-    await sheetsWrite(`'${CONFIG.tasksTab}'!${colLetter(t.statusCol)}${t.sheetRow}`, 'בוצעה');
-    state.tasks = state.tasks.filter(x => x !== t);
-    card.remove();
+    await setStatus(t, 'בוצעה');
     renderTasks();
   } catch (e) {
     box.checked = false;
     box.disabled = false;
-    $('status').textContent = e.message === 'AUTH'
-      ? 'צריך להתחבר מחדש. לחצי על יציאה והתחברי שוב.'
-      : 'לא הצלחתי לסמן את המשימה. נסי שוב.';
+    showStatusError(e);
+  }
+}
+
+async function reopen(t, btn) {
+  btn.disabled = true;
+  try {
+    await setStatus(t, 'פתוחה');
+    renderTasks();
+  } catch (e) {
+    btn.disabled = false;
+    showStatusError(e);
   }
 }
 
@@ -422,17 +485,18 @@ function renderExpiring() {
   const upcoming = state.docs
     .filter(d => d.active && d.expiry && d.expiry >= today)
     .sort((a, b) => a.expiry - b.expiry)
-    .slice(0, 6);
+    .slice(0, CONFIG.maxExpiring);
 
   if (!upcoming.length) {
     box.append(el('p', 'muted', 'אין מסמכים שפגים בקרוב.'));
     return;
   }
   for (const d of upcoming) {
-    const item = el('div', 'mini');
-    item.append(el('div', 'name', d.name));
-    item.append(el('div', 'muted', daysText(d.expiry)));
-    box.append(item);
+    const row = el('div', 'exp-row');
+    const right = el('div', '');
+    right.append(el('div', 'name', d.name), el('div', 'date', d.expiryStr));
+    row.append(right, el('div', 'left muted', daysText(d.expiry)));
+    box.append(row);
   }
 }
 
@@ -442,6 +506,8 @@ $('refreshBtn').onclick = () => {
   else tokenClient.requestAccessToken({ prompt: '' });
 };
 $('logoutBtn').onclick = logout;
+$('tabOpen').onclick = () => setView('open');
+$('tabDone').onclick = () => setView('done');
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js');
