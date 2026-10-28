@@ -605,6 +605,16 @@ function intlPhone(p) {
   return digits.startsWith('0') ? '972' + digits.slice(1) : digits;
 }
 
+function waLink(d) {
+  const v = (d.whatsapp || '').trim();
+  if (v) {
+    if (/^https?:\/\//i.test(v)) return v;
+    if (/wa\.me|whatsapp\.com/i.test(v)) return 'https://' + v.replace(/^\/+/, '');
+    return 'https://wa.me/' + intlPhone(v);
+  }
+  return d.phone ? 'https://wa.me/' + intlPhone(d.phone) : '';
+}
+
 function renderDetail(id) {
   const d = state.docs.find(x => x.id === id);
   if (!d) { closeDoc(); return; }
@@ -631,7 +641,7 @@ function renderDetail(id) {
 
   const contacts = [];
   if (d.phone) contacts.push(contactBtn('phone', 'חיוג', 'tel:' + d.phone.replace(/[\s-]/g, ''), false));
-  const wa = d.whatsapp || (d.phone ? 'https://wa.me/' + intlPhone(d.phone) : '');
+  const wa = waLink(d);
   if (wa) contacts.push(contactBtn('whatsapp', 'וואטסאפ', wa, true));
   if (d.email) contacts.push(contactBtn('mail', 'מייל', `mailto:${d.email}?subject=${encodeURIComponent('פנייה בנוגע ל' + d.name)}`, false));
   if (d.website) contacts.push(contactBtn('globe', 'אתר הספק', /^https?:\/\//.test(d.website) ? d.website : 'https://' + d.website, true));
