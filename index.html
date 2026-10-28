@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#3E6B6B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="הבית שלנו">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>הבית שלנו</title>
+<style>
+:root{--primary:#3E6B6B;--secondary:#A7C4BC;--urgent:#B83A2E;--bg:#F4F7F5;--card:#FFFFFF;--text:#24302E;--muted:#6B7A76}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#1b2321;--card:#243029;--text:#e8efec;--muted:#9fb3ad}}
+:root[data-theme="dark"]{--bg:#1b2321;--card:#243029;--text:#e8efec;--muted:#9fb3ad}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--text);background:var(--bg);min-height:100vh}
+header{position:sticky;top:0;z-index:1;background:var(--primary);color:#fff;display:flex;align-items:center;gap:8px;padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top))}
+header h1{font-size:20px;margin:0;flex:1}
+main{padding:16px;max-width:640px;margin:0 auto;padding-bottom:max(24px,env(safe-area-inset-bottom))}
+h2{font-size:18px;margin:8px 0}
+.card{background:var(--card);border-radius:14px;padding:14px 16px;margin-bottom:12px;border-inline-start:5px solid var(--primary);box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.card.urgent{border-inline-start-color:var(--urgent)}
+.card .title{font-size:16px;font-weight:600;margin:8px 0 2px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:13px;font-weight:600;background:var(--secondary);color:var(--text)}
+.badge.urgent{background:var(--urgent);color:#fff}
+.muted{color:var(--muted);font-size:14px}
+button{font:inherit;border:0;border-radius:12px;padding:12px 18px;background:var(--primary);color:#fff;cursor:pointer;min-height:44px}
+button.ghost{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.6);padding:8px 12px;min-height:36px}
+.login{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;gap:14px}
+.login img{width:120px;height:120px;border-radius:24px}
+.login h1{margin:0}
+.hidden{display:none !important}
+.error{color:var(--urgent);font-weight:600}
+</style>
+</head>
+<body>
+
+<section id="loginView" class="login">
+  <img src="icon-512.png" alt="">
+  <h1>הבית שלנו</h1>
+  <p class="muted">מסמכים, תוקפים ומשימות במקום אחד</p>
+  <button id="loginBtn">כניסה עם Google</button>
+  <p id="loginError" class="error hidden"></p>
+</section>
+
+<section id="appView" class="hidden">
+  <header>
+    <h1>הבית שלנו</h1>
+    <button class="ghost" id="refreshBtn">רענון</button>
+    <button class="ghost" id="logoutBtn">יציאה</button>
+  </header>
+  <main>
+    <p class="muted" id="greeting"></p>
+    <h2>משימות פתוחות</h2>
+    <div id="status" class="muted"></div>
+    <div id="tasks"></div>
+  </main>
+</section>
+
+<script>
+/* ===== הגדרות ===== */
+const CONFIG = {
+  clientId: '234620211821-prcopobtu7dsuq1repcuf40utpf1fj67.apps.googleusercontent.com',
+  sheetId: '1yFDkw0BkKyioAyQC1ulOjj9h97fiufO2Byox9ue0nAo',
+  // מייל -> שם תצוגה. רק המיילים האלה יכולים להיכנס לאפליקציה
+  allowedEmails: { 'hila1993@gmail.com': 'הילה' },
+  tasksTab: 'משימות',
+};
+const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.email';
+
+/* שמות העמודות בטאב "משימות" - האפליקציה מחפשת את השם הראשון שנמצא */
+const COLS = {
+  title: ['משימה', 'כותרת', 'תיאור', 'נושא'],
+  doc: ['מסמך', 'שם המסמך', 'שם מסמך'],
+  due: ['תאריך יעד', 'תאריך', 'יעד'],
+  status: ['סטטוס'],
+  key: ['מפתח'],
+};
+
+const $ = id => document.getElementById(id);
+let tokenClient = null, accessToken = null, tokenExpiresAt = 0, userName = '';
+
+/* ===== התחברות ===== */
+function initGis() {
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CONFIG.clientId,
+    scope: SCOPES,
+    callback: onToken,
+    error_callback: () => {
+      showLoginError('ההתחברות בוטלה או נכשלה. נסי שוב.');
+      $('status').textContent = 'צריך להתחבר מחדש. לחצי על יציאה והתחברי שוב.';
+    },
+  });
+  $('loginBtn').onclick = () => tokenClient.requestAccessToken();
+}
+
+async function onToken(resp) {
+  if (resp.error) { showLoginError('ההתחברות נכשלה.'); return; }
+  accessToken = resp.access_token;
+  tokenExpiresAt = Date.now() + (resp.expires_in - 60) * 1000;
+
+  let email = '';
+  try {
+    const r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: 'Bearer ' + accessToken },
+    });
+    email = ((await r.json()).email || '').toLowerCase();
+  } catch (e) { email = ''; }
+
+  const allowed = Object.keys(CONFIG.allowedEmails).find(k => k === email);
+  if (!allowed) {
+    google.accounts.oauth2.revoke(accessToken, () => {});
+    accessToken = null;
+    showLoginError('החשבון הזה אינו מורשה לגשת לאפליקציה.');
+    return;
+  }
+  userName = CONFIG.allowedEmails[allowed];
+  showApp();
+  loadTasks();
+}
+
+function showLoginError(msg) {
+  const e = $('loginError');
+  e.textContent = msg;
+  e.classList.remove('hidden');
+}
+
+function showApp() {
+  $('loginView').classList.add('hidden');
+  $('appView').classList.remove('hidden');
+  $('greeting').textContent = `היי ${userName}`;
+}
+
+function logout() {
+  if (accessToken) google.accounts.oauth2.revoke(accessToken, () => {});
+  accessToken = null;
+  tokenExpiresAt = 0;
+  $('tasks').innerHTML = '';
+  $('status').textContent = '';
+  $('appView').classList.add('hidden');
+  $('loginView').classList.remove('hidden');
+  $('loginError').classList.add('hidden');
+}
+
+/* ===== קריאה מהגיליון ===== */
+async function sheetsGet(path) {
+  const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.sheetId}/${path}`, {
+    headers: { Authorization: 'Bearer ' + accessToken },
+  });
+  if (r.status === 401 || r.status === 403) throw new Error('AUTH');
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+
+async function loadTasks() {
+  if (CONFIG.sheetId.startsWith('PASTE')) {
+    $('status').textContent = 'חסר מזהה גיליון בקובץ ההגדרות.';
+    return;
+  }
+  if (!accessToken || Date.now() >= tokenExpiresAt) {
+    $('status').textContent = 'פג תוקף ההתחברות. לחצי על רענון.';
+    return;
+  }
+  $('status').textContent = 'טוען...';
+  try {
+    const data = await sheetsGet(`values/${encodeURIComponent(CONFIG.tasksTab)}?valueRenderOption=FORMATTED_VALUE`);
+    renderTasks(parseTasks(data.values || []));
+  } catch (e) {
+    $('status').textContent = e.message === 'AUTH'
+      ? 'צריך להתחבר מחדש. לחצי על יציאה והתחברי שוב.'
+      : 'שגיאה בטעינה. נסי שוב.';
+  }
+}
+
+function findCol(header, names) {
+  for (const n of names) {
+    const i = header.indexOf(n);
+    if (i >= 0) return i;
+  }
+  return -1;
+}
+
+function parseDate(s) {
+  if (!s) return null;
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+  m = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/);
+  if (m) {
+    let y = +m[3];
+    if (y < 100) y += 2000;
+    return new Date(y, +m[2] - 1, +m[1]);
+  }
+  return null;
+}
+
+function parseTasks(rows) {
+  if (rows.length < 2) return [];
+  const header = rows[0].map(h => String(h).trim());
+  const c = {};
+  for (const k in COLS) c[k] = findCol(header, COLS[k]);
+
+  const tasks = [];
+  for (const row of rows.slice(1)) {
+    const get = i => (i >= 0 && row[i] != null) ? String(row[i]).trim() : '';
+    const status = get(c.status);
+    if (status === 'בוצעה' || status === 'הועבר לדחופה') continue;
+
+    const key = get(c.key);
+    const doc = get(c.doc);
+    const dueStr = get(c.due);
+    tasks.push({
+      title: get(c.title) || doc || 'משימה',
+      doc,
+      dueStr,
+      due: parseDate(dueStr),
+      urgent: key.includes('|דחוף'),
+    });
+  }
+  return tasks;
+}
+
+/* ===== תצוגה ===== */
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;
+  return n;
+}
+
+function renderTasks(tasks) {
+  tasks.sort((a, b) => {
+    if (a.urgent !== b.urgent) return a.urgent ? -1 : 1;
+    const da = a.due ? a.due.getTime() : Infinity;
+    const db = b.due ? b.due.getTime() : Infinity;
+    return da - db;
+  });
+
+  const box = $('tasks');
+  box.innerHTML = '';
+  if (!tasks.length) {
+    $('status').textContent = 'אין משימות פתוחות';
+    return;
+  }
+  $('status').textContent = `${tasks.length} משימות פתוחות`;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  for (const t of tasks) {
+    const card = el('div', 'card' + (t.urgent ? ' urgent' : ''));
+    const top = el('div', 'row');
+    top.append(el('span', 'badge' + (t.urgent ? ' urgent' : ''), t.urgent ? 'דחוף' : 'לטיפול'));
+    if (t.due) {
+      const days = Math.round((t.due - today) / 86400000);
+      const text = days < 0 ? `עבר לפני ${-days} ימים`
+        : days === 0 ? 'היום'
+        : `בעוד ${days} ימים`;
+      top.append(el('span', 'muted', text));
+    } else if (t.dueStr) {
+      top.append(el('span', 'muted', t.dueStr));
+    }
+    card.append(top, el('div', 'title', t.title));
+    if (t.doc && t.doc !== t.title) card.append(el('div', 'muted', t.doc));
+    box.append(card);
+  }
+}
+
+/* ===== כפתורים ===== */
+$('refreshBtn').onclick = () => {
+  if (accessToken && Date.now() < tokenExpiresAt) loadTasks();
+  else tokenClient.requestAccessToken({ prompt: '' });
+};
+$('logoutBtn').onclick = logout;
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js');
+}
+</script>
+<script src="https://accounts.google.com/gsi/client" async defer onload="initGis()"></script>
+</body>
+</html>
