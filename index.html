@@ -75,7 +75,6 @@ button.small{padding:8px 12px;min-height:36px;font-size:14px;background:var(--se
   <main>
     <div class="hello">
       <div class="hi" id="greeting"></div>
-      <div class="time" id="timeGreet"></div>
     </div>
 
     <h2>משימות</h2>
@@ -182,8 +181,7 @@ function greetingTime() {
 function showApp() {
   $('loginView').classList.add('hidden');
   $('appView').classList.remove('hidden');
-  $('greeting').textContent = `היי ${userName}`;
-  $('timeGreet').textContent = greetingTime();
+  $('greeting').textContent = `${greetingTime()} ${userName}`;
 }
 
 function logout() {
