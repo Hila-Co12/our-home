@@ -672,6 +672,15 @@ function infoRow(parent, label, value) {
   parent.append(row);
 }
 
+function nextDocId() {
+  const nums = state.docs
+    .map(d => (d.id.match(/^D(\d+)$/) || [])[1])
+    .filter(Boolean)
+    .map(n => parseInt(n, 10));
+  const next = (nums.length ? Math.max(...nums) : 0) + 1;
+  return 'D' + String(next).padStart(3, '0');
+}
+
 function driveId(url) {
   const m = (url || '').match(/\/d\/([^/?#]+)/);
   return m ? m[1] : '';
@@ -900,7 +909,7 @@ $('addForm').onsubmit = async e => {
       const up = await uploadFile(pickedFile, folderId);
       fileUrl = up.webViewLink || `https://drive.google.com/file/d/${up.id}/view`;
     }
-    const id = 'D' + Date.now().toString(36).toUpperCase();
+    const id = nextDocId();
     await appendDocRow([
       id, v('name'), typeName, v('owner'), v('expiry'), days, v('price'),
       v('provider'), fileUrl, v('phone'), '', v('email'), v('website'), 'TRUE',
