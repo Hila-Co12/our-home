@@ -903,7 +903,8 @@ function toggleNewType() {
 function fillTypeSelect() {
   const sel = $('typeSelect');
   sel.innerHTML = '';
-  for (const t of state.types) {
+  const sorted = [...state.types].sort((a, b) => a.name.localeCompare(b.name, 'he'));
+  for (const t of sorted) {
     const o = el('option');
     o.value = t.name;
     o.textContent = t.name;
