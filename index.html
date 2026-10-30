@@ -74,6 +74,9 @@ button.small{padding:8px 12px;min-height:36px;font-size:14px;background:var(--se
 .choice .ico svg{width:22px;height:22px;fill:#fff}
 .choice{background:var(--card);color:var(--text);border:1px solid var(--secondary);border-radius:14px;padding:18px;font-size:17px;text-align:start;min-height:60px;box-shadow:0 1px 3px rgba(0,0,0,.06);font-family:inherit}
 #saveBtn{margin-top:6px}
+.preview{margin-top:14px}
+.preview img{width:100%;border-radius:12px;display:block}
+.preview iframe{width:100%;height:360px;border:0;border-radius:12px;background:var(--card)}
 .hidden{display:none !important}
 .error{color:var(--urgent);font-weight:500}
 </style>
@@ -137,7 +140,7 @@ button.small{padding:8px 12px;min-height:36px;font-size:14px;background:var(--se
     </div>
     <input type="file" accept="image/*" capture="environment" id="fileCam" class="hidden">
     <input type="file" accept="image/*" id="filePhotos" class="hidden">
-    <input type="file" accept="application/pdf,image/*" id="fileFiles" class="hidden">
+    <input type="file" accept="application/pdf" id="fileFiles" class="hidden">
   </main>
   <main id="addFormWrap" class="hidden">
     <form id="addForm" class="form">
@@ -161,6 +164,7 @@ button.small{padding:8px 12px;min-height:36px;font-size:14px;background:var(--se
 
       <button type="submit" id="saveBtn">שמירה</button>
       <p id="addStatus" class="muted"></p>
+      <div id="preview" class="preview"></div>
     </form>
   </main>
 </section>
@@ -723,9 +727,8 @@ const HOME_FOLDER_NAME = 'הבית שלנו - מסמכים';
 let pickedFile = null;
 
 function openAdd() {
-  pickedFile = null;
   $('addForm').reset();
-  $('fileName').textContent = 'לא נבחר קובץ';
+  pickFile(null);
   $('addStatus').textContent = '';
   const dl = $('typeList');
   dl.innerHTML = '';
@@ -756,9 +759,34 @@ function closeAdd() {
   window.scrollTo(0, 0);
 }
 
+let previewUrl = null;
+
 function pickFile(file) {
   pickedFile = file || null;
   $('fileName').textContent = pickedFile ? `נבחר: ${pickedFile.name}` : 'לא נבחר קובץ';
+
+  const box = $('preview');
+  box.innerHTML = '';
+  if (previewUrl) {
+    URL.revokeObjectURL(previewUrl);
+    previewUrl = null;
+  }
+  if (!pickedFile) return;
+
+  previewUrl = URL.createObjectURL(pickedFile);
+  if (pickedFile.type.startsWith('image/')) {
+    const img = el('img');
+    img.src = previewUrl;
+    img.alt = 'תצוגה מקדימה';
+    box.append(img);
+  } else if (pickedFile.type === 'application/pdf') {
+    const frame = el('iframe');
+    frame.src = previewUrl;
+    frame.title = 'תצוגה מקדימה';
+    box.append(frame);
+  } else {
+    box.append(el('p', 'muted', 'אין תצוגה מקדימה לסוג הקובץ הזה.'));
+  }
 }
 
 async function driveFetch(url, options = {}) {
