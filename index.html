@@ -60,6 +60,15 @@ button.small{padding:8px 12px;min-height:36px;font-size:14px;background:var(--se
 .login{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;gap:14px}
 .login img{width:120px;height:120px;border-radius:24px}
 .login h1{margin:0;font-weight:300}
+#appView main{padding-bottom:110px}
+.fab{position:fixed;bottom:max(20px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);box-shadow:0 6px 18px rgba(0,0,0,.2);padding:14px 24px;border-radius:999px;font-size:16px;z-index:2;white-space:nowrap}
+.form{display:flex;flex-direction:column;gap:12px}
+.field{display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--muted)}
+.field input,.field select{font:inherit;font-size:16px;padding:12px;border-radius:12px;border:1px solid var(--secondary);background:var(--card);color:var(--text);min-height:44px}
+.srcs{display:flex;gap:8px;flex-wrap:wrap}
+.srcBtn{flex:1;min-width:90px;text-align:center;background:var(--card);color:var(--text);border:1px solid var(--secondary);border-radius:12px;padding:12px;min-height:44px;font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer;margin:0;font-family:inherit}
+.srcBtn input{display:none}
+#saveBtn{margin-top:6px}
 .hidden{display:none !important}
 .error{color:var(--urgent);font-weight:500}
 </style>
@@ -98,6 +107,7 @@ button.small{padding:8px 12px;min-height:36px;font-size:14px;background:var(--se
     <h2>פג בקרוב</h2>
     <div id="expiring"></div>
   </main>
+  <button class="fab" id="addBtn">+ הוספת מסמך</button>
 </section>
 
 <section id="detailView" class="hidden">
@@ -106,6 +116,42 @@ button.small{padding:8px 12px;min-height:36px;font-size:14px;background:var(--se
     <h1>פרטי מסמך</h1>
   </header>
   <main id="detailMain"></main>
+</section>
+
+<section id="addView" class="hidden">
+  <header>
+    <button class="ghost" id="addBackBtn">ביטול</button>
+    <h1>הוספת מסמך</h1>
+  </header>
+  <main>
+    <form id="addForm" class="form">
+      <div class="srcs">
+        <label class="srcBtn">צילום<input type="file" accept="image/*" capture="environment" id="fileCam"></label>
+        <label class="srcBtn">העלאה<input type="file" accept="image/*,application/pdf" id="fileUp"></label>
+        <button type="button" class="srcBtn" id="srcNone">ללא קובץ</button>
+      </div>
+      <p class="muted" id="fileName">לא נבחר קובץ</p>
+
+      <label class="field">שם המסמך<input name="name" required></label>
+      <label class="field">סוג<input name="type" list="typeList"><datalist id="typeList"></datalist></label>
+      <label class="field">בעלים
+        <select name="owner">
+          <option>הילה</option>
+          <option>שי</option>
+          <option>משותף</option>
+        </select>
+      </label>
+      <label class="field">תאריך תפוגה<input name="expiry" type="date"></label>
+      <label class="field">ספק<input name="provider"></label>
+      <label class="field">מחיר חודשי<input name="price" inputmode="decimal"></label>
+      <label class="field">טלפון ספק<input name="phone" type="tel"></label>
+      <label class="field">מייל ספק<input name="email" type="email"></label>
+      <label class="field">אתר ספק<input name="website" type="url"></label>
+
+      <button type="submit" id="saveBtn">שמירה</button>
+      <p id="addStatus" class="muted"></p>
+    </form>
+  </main>
 </section>
 
 <script>
@@ -217,6 +263,7 @@ function logout() {
   state.tasks = [];
   state.docs = [];
   state.detailId = null;
+  $('addView').classList.add('hidden');
   $('tasks').innerHTML = '';
   $('expiring').innerHTML = '';
   $('filters').innerHTML = '';
@@ -659,6 +706,130 @@ function renderDetail(id) {
   }
   for (const t of related) box.append(taskCard(t, t.status === 'בוצעה'));
 }
+
+/* ===== הוספת מסמך ===== */
+const HOME_FOLDER_NAME = 'הבית שלנו - מסמכים';
+let pickedFile = null;
+
+function openAdd() {
+  pickedFile = null;
+  $('addForm').reset();
+  $('fileName').textContent = 'לא נבחר קובץ';
+  $('addStatus').textContent = '';
+  const dl = $('typeList');
+  dl.innerHTML = '';
+  [...new Set(state.docs.map(d => d.type).filter(Boolean))].forEach(t => {
+    const o = el('option');
+    o.value = t;
+    dl.append(o);
+  });
+  $('appView').classList.add('hidden');
+  $('addView').classList.remove('hidden');
+  window.scrollTo(0, 0);
+}
+
+function closeAdd() {
+  $('addView').classList.add('hidden');
+  $('appView').classList.remove('hidden');
+  window.scrollTo(0, 0);
+}
+
+function pickFile(file) {
+  pickedFile = file || null;
+  $('fileName').textContent = pickedFile ? `נבחר: ${pickedFile.name}` : 'לא נבחר קובץ';
+}
+
+async function driveFetch(url, options = {}) {
+  const r = await fetch(url, {
+    ...options,
+    headers: { Authorization: 'Bearer ' + accessToken, ...(options.headers || {}) },
+  });
+  if (r.status === 401 || r.status === 403) throw new Error('AUTH');
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+
+async function getHomeFolder() {
+  const q = encodeURIComponent(`name='${HOME_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+  const data = await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`);
+  if (data.files && data.files.length) return data.files[0].id;
+  const created = await driveFetch('https://www.googleapis.com/drive/v3/files?fields=id', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: HOME_FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder' }),
+  });
+  return created.id;
+}
+
+async function uploadFile(file, folderId) {
+  const boundary = 'homebinder' + Date.now();
+  const meta = JSON.stringify({ name: file.name, parents: [folderId] });
+  const body = new Blob([
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n`,
+    `--${boundary}\r\nContent-Type: ${file.type || 'application/octet-stream'}\r\n\r\n`,
+    file,
+    `\r\n--${boundary}--`,
+  ]);
+  return driveFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
+    method: 'POST',
+    headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
+    body,
+  });
+}
+
+async function appendDocRow(values) {
+  const range = encodeURIComponent(`'${CONFIG.docsTab}'!A:N`);
+  await driveFetch(sheetUrl(`values/${range}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ values: [values] }),
+  });
+}
+
+$('fileCam').onchange = e => pickFile(e.target.files[0]);
+$('fileUp').onchange = e => pickFile(e.target.files[0]);
+$('srcNone').onclick = () => pickFile(null);
+
+$('addForm').onsubmit = async e => {
+  e.preventDefault();
+  const f = e.target;
+  const v = name => (f.elements[name].value || '').trim();
+  if (!v('name')) {
+    $('addStatus').textContent = 'יש למלא שם מסמך.';
+    return;
+  }
+  if (!accessToken || Date.now() >= tokenExpiresAt) {
+    $('addStatus').textContent = 'פג תוקף ההתחברות. חזרי למסך הראשי והתחברי שוב.';
+    return;
+  }
+
+  $('saveBtn').disabled = true;
+  $('addStatus').textContent = 'שומרת...';
+  try {
+    let fileUrl = '';
+    if (pickedFile) {
+      const folderId = await getHomeFolder();
+      const up = await uploadFile(pickedFile, folderId);
+      fileUrl = up.webViewLink || `https://drive.google.com/file/d/${up.id}/view`;
+    }
+    const id = 'D' + Date.now().toString(36).toUpperCase();
+    await appendDocRow([
+      id, v('name'), v('type'), v('owner'), v('expiry'), '', v('price'),
+      v('provider'), fileUrl, v('phone'), '', v('email'), v('website'), 'TRUE',
+    ]);
+    closeAdd();
+    await loadAll();
+  } catch (err) {
+    $('addStatus').textContent = err.message === 'AUTH'
+      ? 'צריך להתחבר מחדש. חזרי למסך הראשי והתחברי שוב.'
+      : 'השמירה נכשלה. נסי שוב.';
+  } finally {
+    $('saveBtn').disabled = false;
+  }
+};
+
+$('addBtn').onclick = openAdd;
+$('addBackBtn').onclick = closeAdd;
 
 /* ===== כפתורים ===== */
 $('refreshBtn').onclick = () => {
