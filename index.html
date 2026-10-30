@@ -159,7 +159,10 @@ button.small{padding:8px 12px;min-height:36px;font-size:14px;background:var(--se
         </select>
       </label>
       <label class="field">תאריך תפוגה<input name="expiry" type="date"></label>
-      <label class="field">ספק<input name="provider"></label>
+      <label class="field">ספק<input name="provider" id="providerInput" list="providerList" autocomplete="off"><datalist id="providerList"></datalist></label>
+      <button type="button" class="linkish" id="providerSearch">חיפוש שירות לקוחות באינטרנט</button>
+      <p class="muted" id="providerInfo"></p>
+      <label class="field hidden" id="updProviderWrap"><span><input type="checkbox" id="updProvider"> עדכני גם בטאב "ספקים"</span></label>
       <label class="field">מחיר חודשי<input name="price" inputmode="decimal"></label>
       <label class="field">טלפון ספק<input name="phone" type="tel"></label>
       <label class="field">מייל ספק<input name="email" type="email"></label>
@@ -213,7 +216,7 @@ const DOC_COLS = {
 
 const $ = id => document.getElementById(id);
 let tokenClient = null, accessToken = null, tokenExpiresAt = 0, userName = '';
-const state = { tasks: [], docs: [], types: [], filter: 'הכל', view: 'open', detailId: null };
+const state = { tasks: [], docs: [], types: [], providers: [], filter: 'הכל', view: 'open', detailId: null };
 
 /* ===== התחברות ===== */
 function initGis() {
@@ -332,6 +335,7 @@ async function loadAll() {
     state.docs = parseDocs(docsData.values || []);
     state.tasks = parseTasks(tasksData.values || [], state.docs);
     state.types = await loadSettings().catch(() => []);
+    state.providers = await loadProviders().catch(() => []);
     renderFilters();
     renderTasks();
     renderExpiring();
@@ -735,6 +739,10 @@ function openAdd() {
   pickFile(null);
   $('addStatus').textContent = '';
   fillTypeSelect();
+  fillProviderList();
+  $('providerInfo').textContent = '';
+  $('updProvider').checked = false;
+  $('updProviderWrap').classList.add('hidden');
   $('appView').classList.add('hidden');
   $('addView').classList.remove('hidden');
   showAddStep('choose');
@@ -881,6 +889,16 @@ $('addForm').onsubmit = async e => {
       id, v('name'), typeName, v('owner'), v('expiry'), days, v('price'),
       v('provider'), fileUrl, v('phone'), '', v('email'), v('website'), 'TRUE',
     ]);
+    const providerName = v('provider');
+    const existingProvider = findProvider(providerName);
+    if (providerName && !existingProvider) {
+      const freshProviders = await loadProviders();
+      if (!freshProviders.some(p => p.name === providerName)) {
+        await appendProviderRow([providerName, v('phone'), v('email'), v('website'), todayIso()]);
+      }
+    } else if (existingProvider && $('updProvider').checked) {
+      await updateProviderRow(existingProvider.row, [v('phone'), v('email'), v('website'), todayIso()]);
+    }
     if (isNewType) {
       const fresh = await loadSettings();
       if (!fresh.some(t => t.name === typeName)) await appendSettingsRow([typeName, '30']);
@@ -938,6 +956,101 @@ async function appendSettingsRow(values) {
     body: JSON.stringify({ values: [values] }),
   });
 }
+
+async function loadProviders() {
+  const data = await driveFetch(sheetUrl(`values/${encodeURIComponent("'ספקים'!A2:E")}?valueRenderOption=FORMATTED_VALUE`));
+  return (data.values || [])
+    .map((r, i) => ({
+      row: i + 2,
+      name: String(r[0] || '').trim(),
+      phone: String(r[1] || '').trim(),
+      email: String(r[2] || '').trim(),
+      website: String(r[3] || '').trim(),
+      updated: String(r[4] || '').trim(),
+    }))
+    .filter(p => p.name);
+}
+
+async function appendProviderRow(values) {
+  await driveFetch(sheetUrl(`values/${encodeURIComponent("'ספקים'!A:E")}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ values: [values] }),
+  });
+}
+
+async function updateProviderRow(row, values) {
+  await driveFetch(sheetUrl(`values/${encodeURIComponent(`'ספקים'!B${row}:E${row}`)}?valueInputOption=USER_ENTERED`), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ values: [values] }),
+  });
+}
+
+function findProvider(name) {
+  const n = name.trim();
+  return state.providers.find(p => p.name === n);
+}
+
+function todayIso() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function fillProviderList() {
+  const dl = $('providerList');
+  dl.innerHTML = '';
+  state.providers.forEach(p => {
+    const o = el('option');
+    o.value = p.name;
+    dl.append(o);
+  });
+}
+
+function fillProviderFields() {
+  const f = $('addForm');
+  const name = f.elements.provider.value.trim();
+  const p = findProvider(name);
+  const info = $('providerInfo');
+  if (!name) {
+    info.textContent = '';
+    return;
+  }
+  if (!p) {
+    info.textContent = 'ספק חדש. הפרטים שתזיני ייכנסו לטאב "ספקים" בשמירה.';
+    return;
+  }
+  f.elements.phone.value = p.phone;
+  f.elements.email.value = p.email;
+  f.elements.website.value = p.website;
+  const updated = parseDate(p.updated);
+  const months = updated ? (Date.now() - updated.getTime()) / (30 * 86400000) : Infinity;
+  info.textContent = `הפרטים נמצאו בטאב "ספקים", עודכנו: ${p.updated || 'לא ידוע'}`
+    + (months > 12 ? '. הם ישנים מעל שנה, כדאי לבדוק באינטרנט.' : '.');
+}
+
+function updateProviderCheckbox() {
+  const f = $('addForm');
+  const p = findProvider(f.elements.provider.value);
+  const changed = p && ['phone', 'email', 'website'].some(k => {
+    const val = (f.elements[k].value || '').trim();
+    return val !== '' && val !== p[k];
+  });
+  $('updProviderWrap').classList.toggle('hidden', !changed);
+  if (!changed) $('updProvider').checked = false;
+}
+
+$('addForm').addEventListener('input', updateProviderCheckbox);
+$('providerInput').addEventListener('input', fillProviderFields);
+$('providerInput').addEventListener('change', fillProviderFields);
+$('providerSearch').onclick = () => {
+  const name = $('providerInput').value.trim();
+  if (!name) {
+    $('providerInfo').textContent = 'יש להזין שם ספק לפני החיפוש.';
+    return;
+  }
+  window.open('https://www.google.com/search?q=' + encodeURIComponent(name + ' שירות לקוחות'), '_blank', 'noopener');
+};
 
 $('typeSelect').onchange = toggleNewType;
 $('addBtn').onclick = openAdd;
