@@ -792,7 +792,11 @@ async function driveFetch(url, options = {}) {
     ...options,
     headers: { Authorization: 'Bearer ' + accessToken, ...(options.headers || {}) },
   });
-  if (r.status === 401 || r.status === 403) throw new Error('DRIVE_AUTH');
+  if (r.status === 401 || r.status === 403) {
+    let detail = '';
+    try { detail = (await r.json()).error.message; } catch (e) { detail = ''; }
+    throw new Error('DRIVE_AUTH|' + r.status + '|' + detail);
+  }
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }
@@ -884,11 +888,14 @@ $('addForm').onsubmit = async e => {
     closeAdd();
     await loadAll();
   } catch (err) {
-    const msgs = {
-      DRIVE_AUTH: 'אין הרשאה לגוגל. לחצי על יציאה, התחברי מחדש ואשרי את כל ההרשאות.',
-      AUTH: 'צריך להתחבר מחדש. לחצי על יציאה והתחברי שוב.',
-    };
-    $('addStatus').textContent = msgs[err.message] || `השמירה נכשלה (${err.message}). נסי שוב.`;
+    if (err.message.startsWith('DRIVE_AUTH')) {
+      const [, code, detail] = err.message.split('|');
+      $('addStatus').textContent = `שגיאה ${code}: ${detail || 'אין פירוט'}`;
+    } else if (err.message === 'AUTH') {
+      $('addStatus').textContent = 'צריך להתחבר מחדש. לחצי על יציאה והתחברי שוב.';
+    } else {
+      $('addStatus').textContent = `השמירה נכשלה (${err.message}). נסי שוב.`;
+    }
   } finally {
     $('saveBtn').disabled = false;
   }
