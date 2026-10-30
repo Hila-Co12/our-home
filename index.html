@@ -715,7 +715,7 @@ function renderDetail(id) {
   infoRow(info, 'תאריך תפוגה', d.expiryStr ? `${d.expiryStr}${d.expiry ? ' (' + daysText(d.expiry) + ')' : ''}` : 'לא הוגדר');
   infoRow(info, 'בעלים', d.owner || 'לא הוגדר');
   if (d.provider) infoRow(info, 'ספק', d.provider);
-  if (d.price) infoRow(info, 'מחיר חודשי', d.price);
+  if (d.price) infoRow(info, 'מחיר חודשי', `${d.price} ש״ח`);
   card.append(info);
 
   box.append(card);
