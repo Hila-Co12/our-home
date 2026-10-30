@@ -147,7 +147,10 @@ button.small{padding:8px 12px;min-height:36px;font-size:14px;background:var(--se
       <p class="muted" id="fileName">לא נבחר קובץ</p>
 
       <label class="field">שם המסמך<input name="name" required></label>
-      <label class="field">סוג<input name="type" list="typeList"><datalist id="typeList"></datalist></label>
+      <label class="field">סוג
+        <select name="typeSelect" id="typeSelect"></select>
+      </label>
+      <label class="field hidden" id="newTypeWrap">סוג חדש<input name="newType"></label>
       <label class="field">בעלים
         <select name="owner">
           <option>הילה</option>
@@ -210,7 +213,7 @@ const DOC_COLS = {
 
 const $ = id => document.getElementById(id);
 let tokenClient = null, accessToken = null, tokenExpiresAt = 0, userName = '';
-const state = { tasks: [], docs: [], filter: 'הכל', view: 'open', detailId: null };
+const state = { tasks: [], docs: [], types: [], filter: 'הכל', view: 'open', detailId: null };
 
 /* ===== התחברות ===== */
 function initGis() {
@@ -328,6 +331,7 @@ async function loadAll() {
     ]);
     state.docs = parseDocs(docsData.values || []);
     state.tasks = parseTasks(tasksData.values || [], state.docs);
+    state.types = await loadSettings().catch(() => []);
     renderFilters();
     renderTasks();
     renderExpiring();
@@ -730,13 +734,7 @@ function openAdd() {
   $('addForm').reset();
   pickFile(null);
   $('addStatus').textContent = '';
-  const dl = $('typeList');
-  dl.innerHTML = '';
-  [...new Set(state.docs.map(d => d.type).filter(Boolean))].forEach(t => {
-    const o = el('option');
-    o.value = t;
-    dl.append(o);
-  });
+  fillTypeSelect();
   $('appView').classList.add('hidden');
   $('addView').classList.remove('hidden');
   showAddStep('choose');
@@ -794,7 +792,7 @@ async function driveFetch(url, options = {}) {
     ...options,
     headers: { Authorization: 'Bearer ' + accessToken, ...(options.headers || {}) },
   });
-  if (r.status === 401 || r.status === 403) throw new Error('AUTH');
+  if (r.status === 401 || r.status === 403) throw new Error('DRIVE_AUTH');
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }
@@ -852,6 +850,14 @@ $('addForm').onsubmit = async e => {
     $('addStatus').textContent = 'יש למלא שם מסמך.';
     return;
   }
+  const isNewType = f.elements.typeSelect.value === NEW_TYPE;
+  const typeName = isNewType ? v('newType') : f.elements.typeSelect.value;
+  if (!typeName) {
+    $('addStatus').textContent = 'יש לבחור סוג, או להוסיף סוג חדש.';
+    return;
+  }
+  const known = state.types.find(t => t.name === typeName);
+  const days = known ? known.days : '30';
   if (!accessToken || Date.now() >= tokenExpiresAt) {
     $('addStatus').textContent = 'פג תוקף ההתחברות. חזרי למסך הראשי והתחברי שוב.';
     return;
@@ -868,20 +874,64 @@ $('addForm').onsubmit = async e => {
     }
     const id = 'D' + Date.now().toString(36).toUpperCase();
     await appendDocRow([
-      id, v('name'), v('type'), v('owner'), v('expiry'), '', v('price'),
+      id, v('name'), typeName, v('owner'), v('expiry'), days, v('price'),
       v('provider'), fileUrl, v('phone'), '', v('email'), v('website'), 'TRUE',
     ]);
+    if (isNewType) {
+      const fresh = await loadSettings();
+      if (!fresh.some(t => t.name === typeName)) await appendSettingsRow([typeName, '30']);
+    }
     closeAdd();
     await loadAll();
   } catch (err) {
-    $('addStatus').textContent = err.message === 'AUTH'
-      ? 'צריך להתחבר מחדש. חזרי למסך הראשי והתחברי שוב.'
-      : 'השמירה נכשלה. נסי שוב.';
+    const msgs = {
+      DRIVE_AUTH: 'אין הרשאה לגוגל. לחצי על יציאה, התחברי מחדש ואשרי את כל ההרשאות.',
+      AUTH: 'צריך להתחבר מחדש. לחצי על יציאה והתחברי שוב.',
+    };
+    $('addStatus').textContent = msgs[err.message] || `השמירה נכשלה (${err.message}). נסי שוב.`;
   } finally {
     $('saveBtn').disabled = false;
   }
 };
 
+const NEW_TYPE = '__new__';
+
+function toggleNewType() {
+  $('newTypeWrap').classList.toggle('hidden', $('typeSelect').value !== NEW_TYPE);
+}
+
+function fillTypeSelect() {
+  const sel = $('typeSelect');
+  sel.innerHTML = '';
+  for (const t of state.types) {
+    const o = el('option');
+    o.value = t.name;
+    o.textContent = t.name;
+    sel.append(o);
+  }
+  const n = el('option');
+  n.value = NEW_TYPE;
+  n.textContent = '+ סוג חדש';
+  sel.append(n);
+  toggleNewType();
+}
+
+async function loadSettings() {
+  const data = await driveFetch(sheetUrl(`values/${encodeURIComponent("'הגדרות'!A2:B")}?valueRenderOption=FORMATTED_VALUE`));
+  return (data.values || [])
+    .map(r => ({ name: String(r[0] || '').trim(), days: String(r[1] || '').trim() || '30' }))
+    .filter(t => t.name);
+}
+
+async function appendSettingsRow(values) {
+  await driveFetch(sheetUrl(`values/${encodeURIComponent("'הגדרות'!A:B")}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ values: [values] }),
+  });
+}
+
+$('typeSelect').onchange = toggleNewType;
 $('addBtn').onclick = openAdd;
 $('addBackBtn').onclick = closeAdd;
 
