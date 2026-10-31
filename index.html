@@ -165,9 +165,10 @@ button.small{padding:8px 12px;min-height:36px;font-size:14px;background:var(--se
       <p class="muted" id="providerInfo"></p>
       <label class="field hidden" id="updProviderWrap"><span><input type="checkbox" id="updProvider"> עדכני גם בטאב "ספקים"</span></label>
       <label class="field">מחיר חודשי<input name="price" inputmode="decimal"></label>
-      <label class="field">טלפון ספק<input name="phone" type="tel"></label>
-      <label class="field">מייל ספק<input name="email" type="email"></label>
-      <label class="field">אתר ספק<input name="website" type="url"></label>
+      <label class="field">טלפון<input name="phone" type="tel"></label>
+      <label class="field">וואטסאפ<input name="whatsapp" type="tel"></label>
+      <label class="field">מייל<input name="email" type="email"></label>
+      <label class="field">אתר<input name="website" type="url"></label>
 
       <button type="submit" id="saveBtn">שמירה</button>
       <p id="addStatus" class="muted"></p>
@@ -209,7 +210,7 @@ const DOC_COLS = {
   provider: ['ספק'],
   file: ['קישור לקובץ'],
   phone: ['טלפון ספק'],
-  whatsapp: ['קישור לוואטסאפ'],
+  whatsapp: ['וואטסאפ ספק', 'קישור לוואטסאפ'],
   email: ['מייל ספק'],
   website: ['אתר ספק'],
   active: ['פעיל'],
@@ -699,7 +700,7 @@ function waLink(d) {
     if (/wa\.me|whatsapp\.com/i.test(v)) return 'https://' + v.replace(/^\/+/, '');
     return 'https://wa.me/' + intlPhone(v);
   }
-  return d.phone ? 'https://wa.me/' + intlPhone(d.phone) : '';
+  return '';
 }
 
 function renderDetail(id) {
@@ -914,17 +915,17 @@ $('addForm').onsubmit = async e => {
     const id = nextDocId();
     await appendDocRow([
       id, v('name'), typeName, v('owner'), v('expiry'), days, v('price'),
-      v('provider'), fileUrl, v('phone'), '', v('email'), v('website'), 'TRUE',
+      v('provider'), fileUrl, v('phone'), v('whatsapp'), v('email'), v('website'), 'TRUE',
     ]);
     const providerName = v('provider');
     const existingProvider = findProvider(providerName);
     if (providerName && !existingProvider) {
       const freshProviders = await loadProviders();
       if (!freshProviders.some(p => p.name === providerName)) {
-        await appendProviderRow([providerName, v('phone'), v('email'), v('website'), todayIso()]);
+        await appendProviderRow({ name: providerName, phone: v('phone'), whatsapp: v('whatsapp'), email: v('email'), website: v('website'), updated: todayIso() });
       }
     } else if (existingProvider && $('updProvider').checked) {
-      await updateProviderRow(existingProvider.row, [v('phone'), v('email'), v('website'), todayIso()]);
+      await updateProviderRow(existingProvider.row, { phone: v('phone'), whatsapp: v('whatsapp'), email: v('email'), website: v('website'), updated: todayIso() });
     }
     if (isNewType) {
       const fresh = await loadSettings();
@@ -984,33 +985,67 @@ async function appendSettingsRow(values) {
   });
 }
 
+const PROVIDER_COLS = {
+  name: ['שם ספק'],
+  phone: ['טלפון'],
+  whatsapp: ['וואטסאפ'],
+  email: ['מייל'],
+  website: ['אתר'],
+  updated: ['עודכן לאחרונה'],
+};
+let providerCols = null;
+
 async function loadProviders() {
-  const data = await driveFetch(sheetUrl(`values/${encodeURIComponent("'ספקים'!A2:E")}?valueRenderOption=FORMATTED_VALUE`));
-  return (data.values || [])
+  const data = await driveFetch(sheetUrl(`values/${encodeURIComponent("'ספקים'!A1:Z")}?valueRenderOption=FORMATTED_VALUE`));
+  const rows = data.values || [];
+  if (!rows.length) return [];
+  const header = rows[0].map(h => String(h).trim());
+  const c = {};
+  for (const k in PROVIDER_COLS) c[k] = findCol(header, PROVIDER_COLS[k]);
+  providerCols = c;
+  const get = (r, i) => (i >= 0 && r[i] != null) ? String(r[i]).trim() : '';
+  return rows.slice(1)
     .map((r, i) => ({
       row: i + 2,
-      name: String(r[0] || '').trim(),
-      phone: String(r[1] || '').trim(),
-      email: String(r[2] || '').trim(),
-      website: String(r[3] || '').trim(),
-      updated: String(r[4] || '').trim(),
+      name: get(r, c.name),
+      phone: get(r, c.phone),
+      whatsapp: get(r, c.whatsapp),
+      email: get(r, c.email),
+      website: get(r, c.website),
+      updated: get(r, c.updated),
     }))
     .filter(p => p.name);
 }
 
-async function appendProviderRow(values) {
-  await driveFetch(sheetUrl(`values/${encodeURIComponent("'ספקים'!A:E")}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`), {
+async function appendProviderRow(obj) {
+  if (!providerCols) await loadProviders();
+  const width = Math.max(...Object.values(providerCols)) + 1;
+  const row = new Array(width).fill('');
+  for (const k in obj) {
+    const i = providerCols[k];
+    if (i >= 0) row[i] = obj[k];
+  }
+  const range = encodeURIComponent(`'ספקים'!A:${colLetter(width - 1)}`);
+  await driveFetch(sheetUrl(`values/${range}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ values: [values] }),
+    body: JSON.stringify({ values: [row] }),
   });
 }
 
-async function updateProviderRow(row, values) {
-  await driveFetch(sheetUrl(`values/${encodeURIComponent(`'ספקים'!B${row}:E${row}`)}?valueInputOption=USER_ENTERED`), {
-    method: 'PUT',
+async function updateProviderRow(row, obj) {
+  if (!providerCols) await loadProviders();
+  const data = [];
+  for (const k of ['phone', 'whatsapp', 'email', 'website', 'updated']) {
+    const i = providerCols[k];
+    if (obj[k] === undefined || i < 0) continue;
+    data.push({ range: `'ספקים'!${colLetter(i)}${row}`, values: [[obj[k]]] });
+  }
+  if (!data.length) return;
+  await driveFetch(sheetUrl('values:batchUpdate'), {
+    method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ values: [values] }),
+    body: JSON.stringify({ valueInputOption: 'USER_ENTERED', data }),
   });
 }
 
@@ -1048,6 +1083,7 @@ function fillProviderFields() {
     return;
   }
   f.elements.phone.value = p.phone;
+  f.elements.whatsapp.value = p.whatsapp;
   f.elements.email.value = p.email;
   f.elements.website.value = p.website;
   const updated = parseDate(p.updated);
@@ -1059,7 +1095,7 @@ function fillProviderFields() {
 function updateProviderCheckbox() {
   const f = $('addForm');
   const p = findProvider(f.elements.provider.value);
-  const changed = p && ['phone', 'email', 'website'].some(k => {
+  const changed = p && ['phone', 'whatsapp', 'email', 'website'].some(k => {
     const val = (f.elements[k].value || '').trim();
     return val !== '' && val !== p[k];
   });
@@ -1090,6 +1126,25 @@ $('refreshBtn').onclick = () => {
 $('logoutBtn').onclick = logout;
 $('tabOpen').onclick = () => setView('open');
 $('tabDone').onclick = () => setView('done');
+let swipeX = null, swipeY = 0, swipeT = 0;
+document.addEventListener('touchstart', e => {
+  if (e.target.closest('input, select, textarea, iframe, a')) { swipeX = null; return; }
+  const t = e.touches[0];
+  swipeX = t.clientX;
+  swipeY = t.clientY;
+  swipeT = Date.now();
+}, { passive: true });
+document.addEventListener('touchend', e => {
+  if (swipeX === null) return;
+  const t = e.changedTouches[0];
+  const dx = t.clientX - swipeX;
+  const dy = t.clientY - swipeY;
+  const dt = Date.now() - swipeT;
+  swipeX = null;
+  const open = !$('detailView').classList.contains('hidden') || !$('addView').classList.contains('hidden');
+  if (open && Math.abs(dx) > 80 && Math.abs(dy) < 60 && dt < 700) history.back();
+}, { passive: true });
+
 $('backBtn').onclick = () => history.back();
 $('addBackBtn').onclick = () => history.back();
 window.addEventListener('popstate', () => {
