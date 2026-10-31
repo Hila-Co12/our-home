@@ -82,6 +82,10 @@ button.small{padding:8px 12px;min-height:36px;font-size:14px;background:var(--se
 .error{color:var(--urgent);font-weight:500}
 #detailView:not(.hidden),#addView:not(.hidden){position:fixed;inset:0;z-index:20;overflow-y:auto;background:var(--bg);-webkit-overflow-scrolling:touch}
 .underlay{position:fixed !important;inset:0;z-index:10;overflow:hidden;background:var(--bg)}
+#zoomView{position:fixed;inset:0;z-index:100;background:#000;display:flex;flex-direction:column}
+#zoomView .zbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;background:var(--primary);color:#fff;padding-top:max(10px,env(safe-area-inset-top))}
+#zoomView .zbar a{color:#fff;font-size:14px}
+#zoomView iframe{flex:1;width:100%;border:0;background:#fff}
 </style>
 </head>
 <body>
@@ -653,6 +657,8 @@ const ICON_PATHS = {
   phone: 'M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z',
   whatsapp: 'M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z',
   mail: 'M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z',
+  zoom: 'M21 11V3h-8l3.29 3.29-10 10L3 13v8h8l-3.29-3.29 10-10z',
+  drive: 'M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z',
   globe: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z',
 };
 
@@ -706,6 +712,32 @@ function waLink(d) {
   return '';
 }
 
+function openZoom(fileId, title) {
+  if ($('zoomView')) return;
+  history.pushState({ view: 'zoom' }, '');
+  const z = el('div', '');
+  z.id = 'zoomView';
+  const bar = el('div', 'zbar');
+  const close = el('button', 'ghost', 'סגירה');
+  close.onclick = () => history.back();
+  const name = el('span', '', title || '');
+  const open = el('a', '', 'פתיחה ב-Drive');
+  open.href = `https://drive.google.com/file/d/${fileId}/view`;
+  open.target = '_blank';
+  open.rel = 'noopener';
+  bar.append(close, name, open);
+  const frame = el('iframe');
+  frame.src = `https://drive.google.com/file/d/${fileId}/preview`;
+  frame.title = 'תצוגה מוגדלת';
+  z.append(bar, frame);
+  document.body.append(z);
+}
+
+function closeZoom() {
+  const z = $('zoomView');
+  if (z) z.remove();
+}
+
 function renderDetail(id) {
   const d = state.docs.find(x => x.id === id);
   if (!d) { closeDoc(); return; }
@@ -733,6 +765,13 @@ function renderDetail(id) {
     frame.title = 'תצוגה מקדימה של המסמך';
     pv.append(frame);
     box.append(pv);
+
+    const pvActions = el('div', 'contacts');
+    const zoomBtn = contactBtn('zoom', 'הגדלה', '#', false);
+    zoomBtn.addEventListener('click', e => { e.preventDefault(); openZoom(fileId, d.name); });
+    pvActions.append(zoomBtn);
+    pvActions.append(contactBtn('drive', 'פתיחה ב-Drive', d.file, true));
+    box.append(pvActions);
   }
 
   const contacts = [];
@@ -1163,7 +1202,7 @@ function resetViewStyle() {
 
 document.addEventListener('touchstart', e => {
   const view = activeView();
-  if (!view || e.target.closest('input, select, textarea, iframe, a, button')) return;
+  if (!view || $('zoomView') || e.target.closest('input, select, textarea, iframe, a, button')) return;
   const t = e.touches[0];
   if (t.clientX < 28) return; // הקצה השמאלי שמור למחוות הדפדפן של iOS
   swipe = { view, x: t.clientX, y: t.clientY, t: Date.now(), dx: 0, locked: false };
@@ -1233,6 +1272,7 @@ document.addEventListener('touchend', () => {
 $('backBtn').onclick = () => history.back();
 $('addBackBtn').onclick = () => history.back();
 window.addEventListener('popstate', () => {
+  if ($('zoomView')) { closeZoom(); return; }
   if (!$('detailView').classList.contains('hidden')) closeDoc();
   else if (!$('addView').classList.contains('hidden')) closeAdd();
 });
