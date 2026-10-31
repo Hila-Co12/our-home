@@ -619,6 +619,7 @@ function renderExpiring() {
 
 /* ===== מסך פרטי מסמך ===== */
 function openDoc(id) {
+  history.pushState({ view: 'detail' }, '');
   state.detailId = id;
   $('appView').classList.add('hidden');
   $('detailView').classList.remove('hidden');
@@ -731,7 +732,7 @@ function renderDetail(id) {
   }
 
   const contacts = [];
-  if (d.file) contacts.push(contactBtn('file', 'פתיחת הקובץ', d.file, true));
+  if (d.file && !fileId) contacts.push(contactBtn('file', 'פתיחת הקובץ', d.file, true));
   if (d.phone) contacts.push(contactBtn('phone', 'חיוג', 'tel:' + d.phone.replace(/[\s-]/g, ''), false));
   const wa = waLink(d);
   if (wa) contacts.push(contactBtn('whatsapp', 'וואטסאפ', wa, true));
@@ -760,6 +761,7 @@ const HOME_FOLDER_NAME = 'הבית שלנו - מסמכים';
 let pickedFile = null;
 
 function openAdd() {
+  history.pushState({ view: 'add' }, '');
   $('addForm').reset();
   pickFile(null);
   $('addStatus').textContent = '';
@@ -928,7 +930,7 @@ $('addForm').onsubmit = async e => {
       const fresh = await loadSettings();
       if (!fresh.some(t => t.name === typeName)) await appendSettingsRow([typeName, '30']);
     }
-    closeAdd();
+    history.back();
     await loadAll();
   } catch (err) {
     if (err.message.startsWith('DRIVE_AUTH')) {
@@ -1079,7 +1081,6 @@ $('providerSearch').onclick = () => {
 
 $('typeSelect').onchange = toggleNewType;
 $('addBtn').onclick = openAdd;
-$('addBackBtn').onclick = closeAdd;
 
 /* ===== כפתורים ===== */
 $('refreshBtn').onclick = () => {
@@ -1089,7 +1090,12 @@ $('refreshBtn').onclick = () => {
 $('logoutBtn').onclick = logout;
 $('tabOpen').onclick = () => setView('open');
 $('tabDone').onclick = () => setView('done');
-$('backBtn').onclick = closeDoc;
+$('backBtn').onclick = () => history.back();
+$('addBackBtn').onclick = () => history.back();
+window.addEventListener('popstate', () => {
+  if (!$('detailView').classList.contains('hidden')) closeDoc();
+  else if (!$('addView').classList.contains('hidden')) closeAdd();
+});
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js');
