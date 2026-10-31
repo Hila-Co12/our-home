@@ -68,8 +68,9 @@ button.small{padding:8px 12px;min-height:36px;font-size:14px;background:var(--se
 .login{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;gap:14px}
 .login img{width:120px;height:120px;border-radius:24px}
 .login h1{margin:0;font-weight:300}
-#appView main{padding-bottom:110px}
-.fab{position:fixed;bottom:max(20px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);box-shadow:0 6px 18px rgba(0,0,0,.2);padding:14px 24px;border-radius:999px;font-size:16px;z-index:2;white-space:nowrap}
+#appView main{padding-bottom:170px}
+#binderView main{padding-bottom:100px}
+.fab{position:fixed;bottom:calc(72px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);box-shadow:0 6px 18px rgba(0,0,0,.2);padding:14px 24px;border-radius:999px;font-size:16px;z-index:2;white-space:nowrap}
 .form{display:flex;flex-direction:column;gap:12px}
 .field{display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--muted)}
 .field input,.field select{font:inherit;font-size:16px;padding:12px;border-radius:12px;border:1px solid var(--secondary);background:var(--card);color:var(--text);min-height:44px}
@@ -87,12 +88,22 @@ button.small{padding:8px 12px;min-height:36px;font-size:14px;background:var(--se
 .preview iframe{width:100%;height:360px;border:0;border-radius:12px;background:var(--card)}
 .hidden{display:none !important}
 .error{color:var(--urgent);font-weight:500}
-#detailView:not(.hidden),#addView:not(.hidden){position:fixed;inset:0;z-index:20;overflow-y:auto;background:var(--bg);-webkit-overflow-scrolling:touch}
+#categoryView:not(.hidden),#detailView:not(.hidden),#addView:not(.hidden){position:fixed;inset:0;z-index:20;overflow-y:auto;background:var(--bg);-webkit-overflow-scrolling:touch}
 .underlay{position:fixed !important;inset:0;z-index:10;overflow:hidden;background:var(--bg)}
 #zoomView{position:fixed;inset:0;z-index:100;background:#000;display:flex;flex-direction:column}
 #zoomView .zbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;background:var(--primary);color:#fff;padding-top:max(10px,env(safe-area-inset-top))}
 #zoomView .zbar a{color:#fff;font-size:14px}
 #zoomView iframe{flex:1;width:100%;border:0;background:#fff}
+nav.bottom{position:fixed;bottom:0;left:0;right:0;z-index:30;display:flex;background:var(--card);border-top:1px solid var(--secondary);padding-bottom:env(safe-area-inset-bottom)}
+nav.bottom button{flex:1;background:transparent;color:var(--muted);border-radius:0;padding:8px 4px 6px;min-height:58px;font-size:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
+nav.bottom button.on{color:var(--primary);font-weight:500}
+nav.bottom svg{width:24px;height:24px;fill:currentColor}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px}
+.cat-card{background:var(--card);border-radius:14px;padding:14px;border-inline-start:5px solid var(--primary);box-shadow:0 1px 3px rgba(0,0,0,.06);cursor:pointer;min-height:110px;display:flex;flex-direction:column;gap:4px}
+.cat-card.empty{opacity:.55}
+.cat-card .cname{font-size:16px;font-weight:500}
+.cat-card .ccount{font-size:22px;font-weight:300;color:var(--primary)}
+.cat-card .ctypes{font-size:12px;color:var(--muted);line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 </style>
 </head>
 <body>
@@ -132,6 +143,30 @@ button.small{padding:8px 12px;min-height:36px;font-size:14px;background:var(--se
   <button class="fab" id="addBtn">+ הוספת מסמך</button>
 </section>
 
+<section id="binderView" class="hidden">
+  <header>
+    <img class="logo" src="icon-192.png" alt="">
+    <h1>הקלסר שלי</h1>
+  </header>
+  <main>
+    <div id="binderGrid" class="grid"></div>
+  </main>
+</section>
+
+<section id="categoryView" class="hidden">
+  <header>
+    <button class="ghost" id="catBackBtn">חזרה</button>
+    <h1 id="catTitle"></h1>
+  </header>
+  <main>
+    <div class="chips">
+      <button class="chip on" id="catSortExpiry">לפי תאריך תפוגה</button>
+      <button class="chip" id="catSortName">לפי שם</button>
+    </div>
+    <div id="catList"></div>
+  </main>
+</section>
+
 <section id="detailView" class="hidden">
   <header>
     <button class="ghost" id="backBtn">חזרה</button>
@@ -165,6 +200,7 @@ button.small{padding:8px 12px;min-height:36px;font-size:14px;background:var(--se
         <select name="typeSelect" id="typeSelect"></select>
       </label>
       <label class="field hidden" id="newTypeWrap">סוג חדש<input name="newType"></label>
+      <label class="field hidden" id="newCatWrap">קטגוריה לסוג החדש<select name="newCategory" id="newCategory"></select></label>
       <label class="field">בעלים
         <select name="owner">
           <option>הילה</option>
@@ -190,6 +226,10 @@ button.small{padding:8px 12px;min-height:36px;font-size:14px;background:var(--se
   </main>
 </section>
 
+<nav class="bottom hidden" id="bottomNav">
+  <button id="navHome" class="on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg><span>הבית</span></button>
+  <button id="navBinder"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg><span>הקלסר שלי</span></button>
+</nav>
 <script>
 /* ===== הגדרות ===== */
 const CONFIG = {
@@ -231,7 +271,7 @@ const DOC_COLS = {
 
 const $ = id => document.getElementById(id);
 let tokenClient = null, accessToken = null, tokenExpiresAt = 0, userName = '';
-const state = { tasks: [], docs: [], types: [], providers: [], filter: 'הכל', view: 'open', detailId: null };
+const state = { tasks: [], docs: [], types: [], providers: [], filter: 'הכל', view: 'open', detailId: null, stack: [], base: 'app', category: null, catSort: 'expiry' };
 
 /* ===== התחברות ===== */
 function initGis() {
@@ -287,8 +327,11 @@ function greetingTime() {
 
 function showApp() {
   $('loginView').classList.add('hidden');
-  $('detailView').classList.add('hidden');
+  state.stack = [];
+  state.base = 'app';
+  ['detailView', 'addView', 'categoryView', 'binderView'].forEach(id => $(id).classList.add('hidden'));
   $('appView').classList.remove('hidden');
+  updateNav();
   $('greeting').textContent = `${greetingTime()} ${userName}`;
 }
 
@@ -304,9 +347,11 @@ function logout() {
   $('expiring').innerHTML = '';
   $('filters').innerHTML = '';
   $('status').textContent = '';
-  $('detailView').classList.add('hidden');
+  state.stack = [];
+  ['detailView', 'categoryView', 'binderView'].forEach(id => $(id).classList.add('hidden'));
   $('appView').classList.add('hidden');
   $('loginView').classList.remove('hidden');
+  updateNav();
   $('loginError').classList.add('hidden');
 }
 
@@ -354,6 +399,8 @@ async function loadAll() {
     renderFilters();
     renderTasks();
     renderExpiring();
+    renderBinder();
+    if (state.category) renderCategory();
   } catch (e) {
     $('status').textContent = e.message === 'AUTH'
       ? 'צריך להתחבר מחדש. לחצי על יציאה והתחברי שוב.'
@@ -631,22 +678,129 @@ function renderExpiring() {
   }
 }
 
-/* ===== מסך פרטי מסמך ===== */
-function openDoc(id) {
-  history.pushState({ view: 'detail' }, '');
-  state.detailId = id;
-  $('appView').classList.add('hidden');
-  $('detailView').classList.remove('hidden');
-  renderDetail(id);
+/* ===== ניווט: שכבות ושורת ניווט תחתונה ===== */
+function baseId() { return state.base === 'binder' ? 'binderView' : 'appView'; }
+
+function topOverlay() { return state.stack[state.stack.length - 1] || null; }
+
+function pushOverlay(id) {
+  const cur = topOverlay() || baseId();
+  $(cur).classList.add('hidden');
+  state.stack.push(id);
+  history.pushState({ view: id }, '');
+  $(id).classList.remove('hidden');
+  updateNav();
   window.scrollTo(0, 0);
 }
 
-function closeDoc() {
+function popOverlay() {
   resetViewStyle();
-  state.detailId = null;
-  $('detailView').classList.add('hidden');
-  $('appView').classList.remove('hidden');
+  const id = state.stack.pop();
+  if (id) $(id).classList.add('hidden');
+  $(topOverlay() || baseId()).classList.remove('hidden');
+  updateNav();
   window.scrollTo(0, 0);
+}
+
+function closeTop() {
+  const top = topOverlay();
+  if (top === 'detailView') closeDoc();
+  else if (top === 'addView') closeAdd();
+  else if (top === 'categoryView') closeCategory();
+}
+
+function updateNav() {
+  const loggedIn = $('loginView').classList.contains('hidden');
+  $('bottomNav').classList.toggle('hidden', !loggedIn || state.stack.length > 0);
+  $('navHome').classList.toggle('on', state.base === 'app');
+  $('navBinder').classList.toggle('on', state.base === 'binder');
+}
+
+function setBase(b) {
+  if (state.stack.length) return;
+  state.base = b;
+  $('appView').classList.toggle('hidden', b !== 'app');
+  $('binderView').classList.toggle('hidden', b !== 'binder');
+  updateNav();
+  window.scrollTo(0, 0);
+}
+
+/* ===== הקלסר שלי ===== */
+const CATEGORIES = ['חוזים ומנויים', 'חשבונות ותשלומים', 'רכב', 'אישי וזיהוי', 'בריאות ורפואה', 'בית ודירה',
+  'כספים ובנקים', 'חופשות ונסיעות', 'ילדים וחינוך', 'עבודה', 'אחריות ומוצרים חדשים', 'משותף', 'כללי'];
+
+function categoryList() {
+  const extra = [];
+  for (const t of state.types) if (t.category && !CATEGORIES.includes(t.category) && !extra.includes(t.category)) extra.push(t.category);
+  return [...CATEGORIES.slice(0, -1), ...extra, 'כללי'];
+}
+
+function docCategory(d) {
+  const t = state.types.find(x => x.name === d.type);
+  return (t && t.category) || 'כללי';
+}
+
+function renderBinder() {
+  const box = $('binderGrid');
+  box.innerHTML = '';
+  const docs = state.docs.filter(d => d.active);
+  for (const cat of categoryList()) {
+    const inCat = docs.filter(d => docCategory(d) === cat);
+    const types = state.types.filter(t => (t.category || 'כללי') === cat).map(t => t.name);
+    const card = el('div', 'cat-card' + (inCat.length ? '' : ' empty'));
+    card.append(el('div', 'cname', cat), el('div', 'ccount', String(inCat.length)));
+    if (types.length) card.append(el('div', 'ctypes', types.join(' · ')));
+    card.onclick = () => openCategory(cat);
+    box.append(card);
+  }
+}
+
+function openCategory(cat) {
+  state.category = cat;
+  state.catSort = 'expiry';
+  $('catTitle').textContent = cat;
+  renderCategory();
+  pushOverlay('categoryView');
+}
+
+function closeCategory() {
+  state.category = null;
+  popOverlay();
+}
+
+function renderCategory() {
+  $('catSortExpiry').classList.toggle('on', state.catSort === 'expiry');
+  $('catSortName').classList.toggle('on', state.catSort === 'name');
+  const list = $('catList');
+  list.innerHTML = '';
+  const docs = state.docs.filter(d => d.active && docCategory(d) === state.category);
+  docs.sort(state.catSort === 'name'
+    ? (a, b) => a.name.localeCompare(b.name, 'he')
+    : (a, b) => (a.expiry ? a.expiry.getTime() : Infinity) - (b.expiry ? b.expiry.getTime() : Infinity));
+  if (!docs.length) {
+    list.append(el('p', 'muted', 'אין מסמכים בקטגוריה הזו.'));
+    return;
+  }
+  for (const d of docs) {
+    const row = el('div', 'exp-row');
+    const right = el('div', '');
+    right.append(el('div', 'name', d.name), el('div', 'date', [d.type, d.expiryStr].filter(Boolean).join(' · ')));
+    row.append(right, el('div', 'left muted', d.expiry ? daysText(d.expiry) : ''));
+    row.onclick = () => openDoc(d.id);
+    list.append(row);
+  }
+}
+
+/* ===== מסך פרטי מסמך ===== */
+function openDoc(id) {
+  state.detailId = id;
+  pushOverlay('detailView');
+  renderDetail(id);
+}
+
+function closeDoc() {
+  state.detailId = null;
+  popOverlay();
 }
 
 function linkBtn(text, href, light, external) {
@@ -820,7 +974,6 @@ const HOME_FOLDER_NAME = 'הבית שלנו - מסמכים';
 let pickedFile = null;
 
 function openAdd() {
-  history.pushState({ view: 'add' }, '');
   $('addForm').reset();
   pickFile(null);
   $('addStatus').textContent = '';
@@ -829,10 +982,8 @@ function openAdd() {
   $('providerInfo').textContent = '';
   $('updProvider').checked = false;
   $('updProviderWrap').classList.add('hidden');
-  $('appView').classList.add('hidden');
-  $('addView').classList.remove('hidden');
+  pushOverlay('addView');
   showAddStep('choose');
-  window.scrollTo(0, 0);
 }
 
 function showAddStep(step) {
@@ -846,10 +997,7 @@ function chooseSource(file) {
 }
 
 function closeAdd() {
-  resetViewStyle();
-  $('addView').classList.add('hidden');
-  $('appView').classList.remove('hidden');
-  window.scrollTo(0, 0);
+  popOverlay();
 }
 
 let previewUrl = null;
@@ -988,7 +1136,7 @@ $('addForm').onsubmit = async e => {
     }
     if (isNewType) {
       const fresh = await loadSettings();
-      if (!fresh.some(t => t.name === typeName)) await appendSettingsRow([typeName, '30']);
+      if (!fresh.some(t => t.name === typeName)) await appendSettingsRow({ name: typeName, days: '30', category: v('newCategory') || 'כללי' });
     }
     history.back();
     await loadAll();
@@ -1009,10 +1157,24 @@ $('addForm').onsubmit = async e => {
 const NEW_TYPE = '__new__';
 
 function toggleNewType() {
-  $('newTypeWrap').classList.toggle('hidden', $('typeSelect').value !== NEW_TYPE);
+  const isNew = $('typeSelect').value === NEW_TYPE;
+  $('newTypeWrap').classList.toggle('hidden', !isNew);
+  $('newCatWrap').classList.toggle('hidden', !isNew);
+}
+
+function fillCategorySelect() {
+  const sel = $('newCategory');
+  sel.innerHTML = '';
+  for (const c of categoryList()) {
+    const o = el('option');
+    o.value = c;
+    o.textContent = c;
+    sel.append(o);
+  }
 }
 
 function fillTypeSelect() {
+  fillCategorySelect();
   const sel = $('typeSelect');
   sel.innerHTML = '';
   const sorted = [...state.types].sort((a, b) => a.name.localeCompare(b.name, 'he'));
@@ -1029,18 +1191,40 @@ function fillTypeSelect() {
   toggleNewType();
 }
 
+let settingsCols = { name: 0, days: 1, category: -1 };
+
 async function loadSettings() {
-  const data = await driveFetch(sheetUrl(`values/${encodeURIComponent("'הגדרות'!A2:B")}?valueRenderOption=FORMATTED_VALUE`));
-  return (data.values || [])
-    .map(r => ({ name: String(r[0] || '').trim(), days: String(r[1] || '').trim() || '30' }))
+  const data = await driveFetch(sheetUrl(`values/${encodeURIComponent("'הגדרות'!A1:Z")}?valueRenderOption=FORMATTED_VALUE`));
+  const rows = data.values || [];
+  if (!rows.length) return [];
+  const header = rows[0].map(h => String(h).trim());
+  const nameCol = findCol(header, ['סוג מסמך']);
+  const daysCol = findCol(header, ['ימי התראה']);
+  settingsCols = {
+    name: nameCol == null ? 0 : nameCol,
+    days: daysCol == null ? 1 : daysCol,
+    category: (() => { const i = findCol(header, ['קטגוריה']); return i == null ? -1 : i; })(),
+  };
+  const get = (r, i) => (i >= 0 && r[i] != null) ? String(r[i]).trim() : '';
+  return rows.slice(1)
+    .map(r => ({
+      name: get(r, settingsCols.name),
+      days: get(r, settingsCols.days) || '30',
+      category: get(r, settingsCols.category),
+    }))
     .filter(t => t.name);
 }
 
-async function appendSettingsRow(values) {
-  await driveFetch(sheetUrl(`values/${encodeURIComponent("'הגדרות'!A:B")}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`), {
+async function appendSettingsRow(t) {
+  const width = Math.max(settingsCols.name, settingsCols.days, settingsCols.category) + 1;
+  const row = new Array(width).fill('');
+  row[settingsCols.name] = t.name;
+  row[settingsCols.days] = t.days || '30';
+  if (settingsCols.category >= 0) row[settingsCols.category] = t.category || 'כללי';
+  await driveFetch(sheetUrl(`values/${encodeURIComponent("'הגדרות'!A:Z")}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ values: [values] }),
+    body: JSON.stringify({ values: [row] }),
   });
 }
 
@@ -1189,26 +1373,30 @@ let swipe = null;
 document.documentElement.style.overscrollBehaviorX = 'none';
 
 function activeView() {
-  if (!$('detailView').classList.contains('hidden')) return $('detailView');
-  if (!$('addView').classList.contains('hidden')) return $('addView');
-  return null;
+  const id = topOverlay();
+  return id ? $(id) : null;
+}
+
+function underId() {
+  const n = state.stack.length;
+  return n >= 2 ? state.stack[n - 2] : baseId();
 }
 
 function showUnderlay() {
-  $('appView').classList.remove('hidden');
-  $('appView').classList.add('underlay');
+  const u = $(underId());
+  u.classList.remove('hidden');
+  u.classList.add('underlay');
 }
 
 function hideUnderlay() {
-  $('appView').classList.remove('underlay');
-  if (!$('detailView').classList.contains('hidden') || !$('addView').classList.contains('hidden')) {
-    $('appView').classList.add('hidden');
-  }
+  const u = $(underId());
+  u.classList.remove('underlay');
+  if (state.stack.length) u.classList.add('hidden');
 }
 
 function resetViewStyle() {
-  $('appView').classList.remove('underlay');
-  ['detailView', 'addView'].forEach(id => {
+  ['appView', 'binderView', 'categoryView'].forEach(id => $(id).classList.remove('underlay'));
+  ['categoryView', 'detailView', 'addView'].forEach(id => {
     const v = $(id);
     v.style.transform = '';
     v.style.opacity = '';
@@ -1271,8 +1459,7 @@ document.addEventListener('touchend', () => {
       // אם יש רשומה היסטורית של האפליקציה - חוזרים אחורה (popstate יסגור את המסך).
       // אחרת סוגרים ישירות, כדי לא לצאת בטעות מהאפליקציה.
       if (history.state && history.state.view) history.back();
-      else if (v === $('detailView')) closeDoc();
-      else closeAdd();
+      else closeTop();
     }, 200);
   } else {
     v.style.transform = 'translateX(0)';
@@ -1287,10 +1474,14 @@ document.addEventListener('touchend', () => {
 
 $('backBtn').onclick = () => history.back();
 $('addBackBtn').onclick = () => history.back();
+$('catBackBtn').onclick = () => history.back();
+$('catSortExpiry').onclick = () => { state.catSort = 'expiry'; renderCategory(); };
+$('catSortName').onclick = () => { state.catSort = 'name'; renderCategory(); };
+$('navHome').onclick = () => setBase('app');
+$('navBinder').onclick = () => setBase('binder');
 window.addEventListener('popstate', () => {
   if ($('zoomView')) { closeZoom(); return; }
-  if (!$('detailView').classList.contains('hidden')) closeDoc();
-  else if (!$('addView').classList.contains('hidden')) closeAdd();
+  closeTop();
 });
 
 if ('serviceWorker' in navigator) {
