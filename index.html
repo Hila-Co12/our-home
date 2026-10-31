@@ -49,6 +49,11 @@ h2{font-size:18px;font-weight:400;margin:22px 0 8px}
 .info-row:last-child{border-bottom:0}
 .btn{display:inline-flex;align-items:center;justify-content:center;background:var(--primary);color:#fff;text-decoration:none;border-radius:12px;padding:12px 16px;min-height:44px;font-size:15px}
 .btn.light{background:var(--secondary);color:var(--text)}
+.detail-preview{position:relative;margin-bottom:12px}
+.detail-preview iframe{margin-bottom:0 !important}
+.pv-tools{position:absolute;top:10px;left:10px;display:flex;gap:8px}
+.pv-btn{width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;border:0;padding:0;cursor:pointer;text-decoration:none}
+.pv-btn svg{width:20px;height:20px;fill:#fff}
 .detail-preview iframe{width:100%;height:420px;border:0;border-radius:14px;background:var(--card);margin-bottom:12px;display:block}
 .contacts{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin-bottom:12px}
 .contact{display:flex;flex-direction:column;align-items:center;gap:6px;text-decoration:none;color:var(--text);font-size:13px;width:76px}
@@ -764,14 +769,23 @@ function renderDetail(id) {
     frame.src = `https://drive.google.com/file/d/${fileId}/preview`;
     frame.title = 'תצוגה מקדימה של המסמך';
     pv.append(frame);
-    box.append(pv);
 
-    const pvActions = el('div', 'contacts');
-    const zoomBtn = contactBtn('zoom', 'הגדלה', '#', false);
-    zoomBtn.addEventListener('click', e => { e.preventDefault(); openZoom(fileId, d.name); });
-    pvActions.append(zoomBtn);
-    pvActions.append(contactBtn('drive', 'פתיחה ב-Drive', d.file, true));
-    box.append(pvActions);
+    // כפתורים קטנים מעל התמונה: הגדלה ופתיחה ב-Drive
+    const tools = el('div', 'pv-tools');
+    const zoomBtn = el('button', 'pv-btn');
+    zoomBtn.type = 'button';
+    zoomBtn.setAttribute('aria-label', 'הגדלה');
+    zoomBtn.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${ICON_PATHS.zoom}"/></svg>`;
+    zoomBtn.onclick = () => openZoom(fileId, d.name);
+    const driveBtn = el('a', 'pv-btn');
+    driveBtn.href = d.file;
+    driveBtn.target = '_blank';
+    driveBtn.rel = 'noopener';
+    driveBtn.setAttribute('aria-label', 'פתיחה ב-Drive');
+    driveBtn.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${ICON_PATHS.drive}"/></svg>`;
+    tools.append(zoomBtn, driveBtn);
+    pv.append(tools);
+    box.append(pv);
   }
 
   const contacts = [];
