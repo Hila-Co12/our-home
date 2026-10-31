@@ -1129,6 +1129,7 @@ $('logoutBtn').onclick = logout;
 $('tabOpen').onclick = () => setView('open');
 $('tabDone').onclick = () => setView('done');
 let swipe = null;
+document.documentElement.style.overscrollBehaviorX = 'none';
 
 function activeView() {
   if (!$('detailView').classList.contains('hidden')) return $('detailView');
@@ -1149,6 +1150,7 @@ document.addEventListener('touchstart', e => {
   const view = activeView();
   if (!view || e.target.closest('input, select, textarea, iframe, a, button')) return;
   const t = e.touches[0];
+  if (t.clientX < 28) return; // הקצה השמאלי שמור למחוות הדפדפן של iOS
   swipe = { view, x: t.clientX, y: t.clientY, t: Date.now(), dx: 0, locked: false };
 }, { passive: true });
 
@@ -1180,7 +1182,13 @@ document.addEventListener('touchend', () => {
     const dir = s.dx > 0 ? 1 : -1;
     v.style.transform = `translateX(${dir * window.innerWidth}px)`;
     v.style.opacity = '0';
-    setTimeout(() => history.back(), 200);
+    setTimeout(() => {
+      // אם יש רשומה היסטורית של האפליקציה - חוזרים אחורה (popstate יסגור את המסך).
+      // אחרת סוגרים ישירות, כדי לא לצאת בטעות מהאפליקציה.
+      if (history.state && history.state.view) history.back();
+      else if (v === $('detailView')) closeDoc();
+      else closeAdd();
+    }, 200);
   } else {
     v.style.transform = 'translateX(0)';
     v.style.opacity = '1';
