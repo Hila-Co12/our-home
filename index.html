@@ -164,7 +164,7 @@ button.small{padding:8px 12px;min-height:36px;font-size:14px;background:var(--se
       <button type="button" class="linkish" id="providerSearch">חיפוש שירות לקוחות באינטרנט</button>
       <p class="muted" id="providerInfo"></p>
       <label class="field hidden" id="updProviderWrap"><span><input type="checkbox" id="updProvider"> עדכני גם בטאב "ספקים"</span></label>
-      <label class="field">מחיר חודשי<input name="price" inputmode="decimal"></label>
+      <label class="field">מחיר<input name="price" inputmode="decimal"></label>
       <label class="field">טלפון<input name="phone" type="tel"></label>
       <label class="field">וואטסאפ<input name="whatsapp" type="tel"></label>
       <label class="field">מייל<input name="email" type="email"></label>
@@ -206,7 +206,7 @@ const DOC_COLS = {
   type: ['סוג'],
   owner: ['בעלים'],
   expiry: ['תאריך תפוגה'],
-  price: ['מחיר חודשי'],
+  price: ['מחיר', 'מחיר חודשי'],
   provider: ['ספק'],
   file: ['קישור לקובץ'],
   phone: ['טלפון ספק'],
@@ -629,6 +629,7 @@ function openDoc(id) {
 }
 
 function closeDoc() {
+  resetViewStyle();
   state.detailId = null;
   $('detailView').classList.add('hidden');
   $('appView').classList.remove('hidden');
@@ -717,7 +718,7 @@ function renderDetail(id) {
   infoRow(info, 'תאריך תפוגה', d.expiryStr ? `${d.expiryStr}${d.expiry ? ' (' + daysText(d.expiry) + ')' : ''}` : 'לא הוגדר');
   infoRow(info, 'בעלים', d.owner || 'לא הוגדר');
   if (d.provider) infoRow(info, 'ספק', d.provider);
-  if (d.price) infoRow(info, 'מחיר חודשי', `${d.price} ש״ח`);
+  if (d.price) infoRow(info, 'מחיר', `${d.price} ש״ח`);
   card.append(info);
 
   box.append(card);
@@ -788,6 +789,7 @@ function chooseSource(file) {
 }
 
 function closeAdd() {
+  resetViewStyle();
   $('addView').classList.add('hidden');
   $('appView').classList.remove('hidden');
   window.scrollTo(0, 0);
@@ -1126,23 +1128,63 @@ $('refreshBtn').onclick = () => {
 $('logoutBtn').onclick = logout;
 $('tabOpen').onclick = () => setView('open');
 $('tabDone').onclick = () => setView('done');
-let swipeX = null, swipeY = 0, swipeT = 0;
+let swipe = null;
+
+function activeView() {
+  if (!$('detailView').classList.contains('hidden')) return $('detailView');
+  if (!$('addView').classList.contains('hidden')) return $('addView');
+  return null;
+}
+
+function resetViewStyle() {
+  ['detailView', 'addView'].forEach(id => {
+    const v = $(id);
+    v.style.transform = '';
+    v.style.opacity = '';
+    v.style.transition = '';
+  });
+}
+
 document.addEventListener('touchstart', e => {
-  if (e.target.closest('input, select, textarea, iframe, a')) { swipeX = null; return; }
+  const view = activeView();
+  if (!view || e.target.closest('input, select, textarea, iframe, a, button')) return;
   const t = e.touches[0];
-  swipeX = t.clientX;
-  swipeY = t.clientY;
-  swipeT = Date.now();
+  swipe = { view, x: t.clientX, y: t.clientY, t: Date.now(), dx: 0, locked: false };
 }, { passive: true });
-document.addEventListener('touchend', e => {
-  if (swipeX === null) return;
-  const t = e.changedTouches[0];
-  const dx = t.clientX - swipeX;
-  const dy = t.clientY - swipeY;
-  const dt = Date.now() - swipeT;
-  swipeX = null;
-  const open = !$('detailView').classList.contains('hidden') || !$('addView').classList.contains('hidden');
-  if (open && Math.abs(dx) > 80 && Math.abs(dy) < 60 && dt < 700) history.back();
+
+document.addEventListener('touchmove', e => {
+  if (!swipe) return;
+  const t = e.touches[0];
+  const dx = t.clientX - swipe.x;
+  const dy = t.clientY - swipe.y;
+  if (!swipe.locked) {
+    if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { swipe = null; return; }
+    if (Math.abs(dx) < 10) return;
+    swipe.locked = true;
+  }
+  swipe.dx = dx;
+  swipe.view.style.transition = 'none';
+  swipe.view.style.transform = `translateX(${dx}px)`;
+  swipe.view.style.opacity = String(Math.max(0.5, 1 - Math.abs(dx) / 500));
+}, { passive: true });
+
+document.addEventListener('touchend', () => {
+  if (!swipe) return;
+  const s = swipe;
+  swipe = null;
+  if (!s.locked) return;
+  const flick = Math.abs(s.dx) > 40 && (Date.now() - s.t) < 250;
+  const v = s.view;
+  v.style.transition = 'transform .2s ease-out, opacity .2s ease-out';
+  if (Math.abs(s.dx) > window.innerWidth * 0.3 || flick) {
+    const dir = s.dx > 0 ? 1 : -1;
+    v.style.transform = `translateX(${dir * window.innerWidth}px)`;
+    v.style.opacity = '0';
+    setTimeout(() => history.back(), 200);
+  } else {
+    v.style.transform = 'translateX(0)';
+    v.style.opacity = '1';
+  }
 }, { passive: true });
 
 $('backBtn').onclick = () => history.back();
