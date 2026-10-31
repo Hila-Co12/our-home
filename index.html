@@ -80,6 +80,8 @@ button.small{padding:8px 12px;min-height:36px;font-size:14px;background:var(--se
 .preview iframe{width:100%;height:360px;border:0;border-radius:12px;background:var(--card)}
 .hidden{display:none !important}
 .error{color:var(--urgent);font-weight:500}
+#detailView:not(.hidden),#addView:not(.hidden){position:fixed;inset:0;z-index:20;overflow-y:auto;background:var(--bg);-webkit-overflow-scrolling:touch}
+.underlay{position:fixed !important;inset:0;z-index:10;overflow:hidden;background:var(--bg)}
 </style>
 </head>
 <body>
@@ -1137,7 +1139,20 @@ function activeView() {
   return null;
 }
 
+function showUnderlay() {
+  $('appView').classList.remove('hidden');
+  $('appView').classList.add('underlay');
+}
+
+function hideUnderlay() {
+  $('appView').classList.remove('underlay');
+  if (!$('detailView').classList.contains('hidden') || !$('addView').classList.contains('hidden')) {
+    $('appView').classList.add('hidden');
+  }
+}
+
 function resetViewStyle() {
+  $('appView').classList.remove('underlay');
   ['detailView', 'addView'].forEach(id => {
     const v = $(id);
     v.style.transform = '';
@@ -1152,7 +1167,17 @@ document.addEventListener('touchstart', e => {
   const t = e.touches[0];
   if (t.clientX < 28) return; // הקצה השמאלי שמור למחוות הדפדפן של iOS
   swipe = { view, x: t.clientX, y: t.clientY, t: Date.now(), dx: 0, locked: false };
+  showUnderlay();
 }, { passive: true });
+
+let swipeFrame = 0;
+function paintSwipe() {
+  swipeFrame = 0;
+  if (!swipe || !swipe.locked) return;
+  swipe.view.style.transition = 'none';
+  swipe.view.style.transform = `translateX(${swipe.dx}px)`;
+  swipe.view.style.opacity = String(Math.max(0.5, 1 - Math.abs(swipe.dx) / 500));
+}
 
 document.addEventListener('touchmove', e => {
   if (!swipe) return;
@@ -1161,22 +1186,27 @@ document.addEventListener('touchmove', e => {
   const dy = t.clientY - swipe.y;
   if (!swipe.locked) {
     if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { swipe = null; return; }
-    if (Math.abs(dx) < 10) return;
+    if (Math.abs(dx) < 10 || Math.abs(dx) < Math.abs(dy)) return;
+    // מתחילים מהנקודה הנוכחית, כדי שהמסך לא יקפוץ בנקודת הנעילה
+    swipe.x = t.clientX;
     swipe.locked = true;
+    swipe.dx = 0;
+    swipe.view.style.touchAction = 'pan-y';
+    swipe.view.style.willChange = 'transform, opacity';
+    return;
   }
-  swipe.dx = dx;
-  swipe.view.style.transition = 'none';
-  swipe.view.style.transform = `translateX(${dx}px)`;
-  swipe.view.style.opacity = String(Math.max(0.5, 1 - Math.abs(dx) / 500));
+  swipe.dx = t.clientX - swipe.x;
+  if (!swipeFrame) swipeFrame = requestAnimationFrame(paintSwipe);
 }, { passive: true });
 
 document.addEventListener('touchend', () => {
   if (!swipe) return;
   const s = swipe;
   swipe = null;
-  if (!s.locked) return;
-  const flick = Math.abs(s.dx) > 40 && (Date.now() - s.t) < 250;
+  if (swipeFrame) { cancelAnimationFrame(swipeFrame); swipeFrame = 0; }
+  if (!s.locked) { hideUnderlay(); return; }
   const v = s.view;
+  const flick = Math.abs(s.dx) > 40 && (Date.now() - s.t) < 250;
   v.style.transition = 'transform .2s ease-out, opacity .2s ease-out';
   if (Math.abs(s.dx) > window.innerWidth * 0.3 || flick) {
     const dir = s.dx > 0 ? 1 : -1;
@@ -1192,6 +1222,11 @@ document.addEventListener('touchend', () => {
   } else {
     v.style.transform = 'translateX(0)';
     v.style.opacity = '1';
+    setTimeout(() => {
+      if (swipe) return;
+      v.style.transition = ''; v.style.willChange = ''; v.style.touchAction = '';
+      hideUnderlay();
+    }, 220);
   }
 }, { passive: true });
 
