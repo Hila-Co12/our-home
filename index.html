@@ -71,7 +71,7 @@ button.small{padding:8px 12px;min-height:36px;font-size:14px;background:var(--se
 .login img{width:120px;height:120px;border-radius:24px}
 .login h1{margin:0;font-weight:300}
 #appView main{padding-bottom:170px}
-#binderView main{padding-bottom:100px}
+#binderView main,#timelineView main{padding-bottom:100px}
 .fab{position:fixed;bottom:calc(72px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);box-shadow:0 6px 18px rgba(0,0,0,.2);padding:14px 24px;border-radius:999px;font-size:16px;z-index:2;white-space:nowrap}
 .form{display:flex;flex-direction:column;gap:12px}
 .field{display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--muted)}
@@ -90,7 +90,7 @@ button.small{padding:8px 12px;min-height:36px;font-size:14px;background:var(--se
 .preview iframe{width:100%;height:360px;border:0;border-radius:12px;background:var(--card)}
 .hidden{display:none !important}
 .error{color:var(--urgent);font-weight:500}
-#appView:not(.hidden),#binderView:not(.hidden){position:fixed;inset:0;z-index:1;overflow-y:auto;overscroll-behavior:contain;background:var(--bg);-webkit-overflow-scrolling:touch}
+#appView:not(.hidden),#binderView:not(.hidden),#timelineView:not(.hidden){position:fixed;inset:0;z-index:1;overflow-y:auto;overscroll-behavior:contain;background:var(--bg);-webkit-overflow-scrolling:touch}
 #categoryView:not(.hidden),#detailView:not(.hidden),#addView:not(.hidden){position:fixed;inset:0;z-index:20;overflow-y:auto;overscroll-behavior:contain;background:var(--bg);-webkit-overflow-scrolling:touch}
 .underlay{position:fixed !important;inset:0;z-index:10;overflow:hidden;background:var(--bg)}
 #zoomView{position:fixed;inset:0;z-index:100;background:#000;display:flex;flex-direction:column}
@@ -107,6 +107,16 @@ nav.bottom svg{width:24px;height:24px;fill:currentColor}
 .cat-card .cname{font-size:16px;font-weight:500}
 .cat-card .ccount{font-size:22px;font-weight:300;color:var(--primary)}
 .cat-card .ctypes{font-size:12px;color:var(--muted);line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tl-month{display:flex;justify-content:space-between;align-items:baseline;font-size:18px;font-weight:400;margin:22px 0 8px}
+.tl-month .cnt{color:var(--muted);font-size:14px}
+.tl-month.late{color:var(--urgent)}
+.tl-row{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--card);border-radius:12px;padding:12px 14px;margin-bottom:8px;border-inline-start:4px solid var(--primary);cursor:pointer}
+.tl-row.late{border-inline-start-color:var(--urgent)}
+.tl-row.urgent{border-inline-start-color:var(--urgent)}
+.tl-row .name{font-weight:500;font-size:15px}
+.tl-row .date{color:var(--muted);font-size:13px;margin-top:2px}
+.tl-row .tags{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:0 0 auto}
+.badge.late{background:transparent;color:var(--urgent);border:1px solid var(--urgent)}
 </style>
 </head>
 <body>
@@ -153,6 +163,16 @@ nav.bottom svg{width:24px;height:24px;fill:currentColor}
   </header>
   <main>
     <div id="binderGrid" class="grid"></div>
+  </main>
+</section>
+
+<section id="timelineView" class="hidden">
+  <header>
+    <img class="logo" src="icon-192.png" alt="">
+    <h1>ציר זמן</h1>
+  </header>
+  <main>
+    <div id="timelineList"></div>
   </main>
 </section>
 
@@ -232,6 +252,7 @@ nav.bottom svg{width:24px;height:24px;fill:currentColor}
 <nav class="bottom hidden" id="bottomNav">
   <button id="navHome" class="on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg><span>הבית</span></button>
   <button id="navBinder"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg><span>הקלסר שלי</span></button>
+  <button id="navTimeline"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 3h-1V1h-2v2H8V1H6v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg><span>ציר זמן</span></button>
 </nav>
 <script>
 /* ===== הגדרות ===== */
@@ -332,7 +353,7 @@ function showApp() {
   $('loginView').classList.add('hidden');
   state.stack = [];
   state.base = 'app';
-  ['detailView', 'addView', 'categoryView', 'binderView'].forEach(id => $(id).classList.add('hidden'));
+  ['detailView', 'addView', 'categoryView', 'binderView', 'timelineView'].forEach(id => $(id).classList.add('hidden'));
   $('appView').classList.remove('hidden');
   updateNav();
   $('greeting').textContent = `${greetingTime()} ${userName}`;
@@ -351,7 +372,7 @@ function logout() {
   $('filters').innerHTML = '';
   $('status').textContent = '';
   state.stack = [];
-  ['detailView', 'categoryView', 'binderView'].forEach(id => $(id).classList.add('hidden'));
+  ['detailView', 'categoryView', 'binderView', 'timelineView'].forEach(id => $(id).classList.add('hidden'));
   $('appView').classList.add('hidden');
   $('loginView').classList.remove('hidden');
   updateNav();
@@ -403,6 +424,7 @@ async function loadAll() {
     renderTasks();
     renderExpiring();
     renderBinder();
+    renderTimeline();
     if (state.category) renderCategory();
   } catch (e) {
     $('status').textContent = e.message === 'AUTH'
@@ -694,7 +716,7 @@ function renderExpiring() {
 }
 
 /* ===== ניווט: שכבות ושורת ניווט תחתונה ===== */
-function baseId() { return state.base === 'binder' ? 'binderView' : 'appView'; }
+function baseId() { return ({ app: 'appView', binder: 'binderView', timeline: 'timelineView' })[state.base] || 'appView'; }
 
 function topOverlay() { return state.stack[state.stack.length - 1] || null; }
 
@@ -729,6 +751,7 @@ function updateNav() {
   $('bottomNav').classList.toggle('hidden', !loggedIn || state.stack.length > 0);
   $('navHome').classList.toggle('on', state.base === 'app');
   $('navBinder').classList.toggle('on', state.base === 'binder');
+  $('navTimeline').classList.toggle('on', state.base === 'timeline');
 }
 
 function setBase(b) {
@@ -736,8 +759,71 @@ function setBase(b) {
   state.base = b;
   $('appView').classList.toggle('hidden', b !== 'app');
   $('binderView').classList.toggle('hidden', b !== 'binder');
+  $('timelineView').classList.toggle('hidden', b !== 'timeline');
   updateNav();
   window.scrollTo(0, 0);
+}
+
+/* ===== ציר זמן ===== */
+function monthLabel(d) {
+  return d.toLocaleDateString('he-IL', { month: 'long', year: 'numeric' });
+}
+
+function renderTimeline() {
+  const box = $('timelineList');
+  box.innerHTML = '';
+  const today = startOfToday();
+  const docById = Object.fromEntries(state.docs.map(d => [d.id, d]));
+
+  // פריטים: משימות פתוחות ומסמכים פעילים עם תאריך תפוגה
+  const items = [];
+  for (const t of state.tasks) {
+    if (t.status === 'בוצעה' || !t.due) continue;
+    items.push({ kind: 'task', date: t.due, title: t.title, docId: t.docId, urgent: t.urgent, doc: docById[t.docId] });
+  }
+  for (const d of state.docs) {
+    if (!d.active || !d.expiry) continue;
+    items.push({ kind: 'doc', date: d.expiry, title: d.name, docId: d.id, doc: d });
+  }
+  if (!items.length) {
+    box.append(el('p', 'muted', 'אין משימות או תפוגות להצגה.'));
+    return;
+  }
+  items.sort((a, b) => a.date - b.date);
+
+  const late = items.filter(i => i.date < today);
+  const groups = [];
+  if (late.length) groups.push({ label: 'באיחור', late: true, items: late });
+  const byMonth = new Map();
+  for (const i of items.filter(i => i.date >= today)) {
+    const key = i.date.getFullYear() * 100 + i.date.getMonth();
+    if (!byMonth.has(key)) byMonth.set(key, { label: monthLabel(i.date), items: [] });
+    byMonth.get(key).items.push(i);
+  }
+  for (const g of byMonth.values()) groups.push(g);
+
+  for (const g of groups) {
+    const h = el('div', 'tl-month' + (g.late ? ' late' : ''));
+    h.append(el('span', '', g.label), el('span', 'cnt', String(g.items.length)));
+    box.append(h);
+    for (const i of g.items) {
+      const isLate = i.date < today;
+      const row = el('div', 'tl-row' + (isLate ? ' late' : (i.urgent ? ' urgent' : '')));
+      const right = el('div', '');
+      right.append(el('div', 'name', i.title), el('div', 'date', `${fmtDate(i.date)} · ${daysText(i.date)}`));
+      const tags = el('div', 'tags');
+      if (i.kind === 'doc') tags.append(el('span', 'badge' + (isLate ? ' late' : ''), isLate ? 'פג תוקף' : 'תפוגה'));
+      else if (isLate) tags.append(el('span', 'badge late', 'לא טופל'));
+      else tags.append(el('span', 'badge' + (i.urgent ? ' urgent' : ''), i.urgent ? 'דחוף' : 'משימה'));
+      row.append(right, tags);
+      if (i.doc) row.onclick = () => openDoc(i.docId);
+      box.append(row);
+    }
+  }
+}
+
+function fmtDate(d) {
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 }
 
 /* ===== הקלסר שלי ===== */
@@ -1410,7 +1496,7 @@ function hideUnderlay() {
 }
 
 function resetViewStyle() {
-  ['appView', 'binderView', 'categoryView'].forEach(id => $(id).classList.remove('underlay'));
+  ['appView', 'binderView', 'timelineView', 'categoryView'].forEach(id => $(id).classList.remove('underlay'));
   ['categoryView', 'detailView', 'addView'].forEach(id => {
     const v = $(id);
     v.style.transform = '';
@@ -1494,6 +1580,7 @@ $('catSortExpiry').onclick = () => { state.catSort = 'expiry'; renderCategory();
 $('catSortName').onclick = () => { state.catSort = 'name'; renderCategory(); };
 $('navHome').onclick = () => setBase('app');
 $('navBinder').onclick = () => setBase('binder');
+$('navTimeline').onclick = () => setBase('timeline');
 window.addEventListener('popstate', () => {
   if ($('zoomView')) { closeZoom(); return; }
   closeTop();
