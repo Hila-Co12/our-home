@@ -44,6 +44,8 @@ h2{font-size:18px;font-weight:400;margin:22px 0 8px}
 .exp-row .name{font-weight:500;font-size:15px}
 .exp-row .date{color:var(--muted);font-size:13px;margin-top:2px}
 .exp-row .left{text-align:left;font-size:14px;white-space:nowrap}
+.exp-row.expired{border-inline-start-color:var(--urgent)}
+.exp-row .expired-tag{color:var(--urgent);font-weight:500}
 .linkish{background:none;border:0;color:var(--primary);padding:0;min-height:0;font:inherit;text-decoration:underline;cursor:pointer;font-size:14px;margin-top:4px}
 .info-row{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--bg)}
 .info-row:last-child{border-bottom:0}
@@ -659,20 +661,32 @@ function renderExpiring() {
   const box = $('expiring');
   box.innerHTML = '';
   const today = startOfToday();
+  // מסמכים שפג תוקפם מופיעים ראשונים (הישן ביותר קודם), ואחריהם הקרובים לפי תאריך
+  const expired = state.docs
+    .filter(d => d.active && d.expiry && d.expiry < today)
+    .sort((a, b) => a.expiry - b.expiry);
   const upcoming = state.docs
     .filter(d => d.active && d.expiry && d.expiry >= today)
     .sort((a, b) => a.expiry - b.expiry)
     .slice(0, CONFIG.maxExpiring);
 
-  if (!upcoming.length) {
+  if (!expired.length && !upcoming.length) {
     box.append(el('p', 'muted', 'אין מסמכים שפגים בקרוב.'));
     return;
   }
-  for (const d of upcoming) {
-    const row = el('div', 'exp-row');
+  for (const d of [...expired, ...upcoming]) {
+    const isExpired = d.expiry < today;
+    const row = el('div', 'exp-row' + (isExpired ? ' expired' : ''));
     const right = el('div', '');
     right.append(el('div', 'name', d.name), el('div', 'date', d.expiryStr));
-    row.append(right, el('div', 'left muted', daysText(d.expiry)));
+    const left = el('div', 'left');
+    if (isExpired) {
+      left.append(el('div', 'expired-tag', 'פג תוקף'), el('div', 'muted', daysText(d.expiry)));
+    } else {
+      left.classList.add('muted');
+      left.textContent = daysText(d.expiry);
+    }
+    row.append(right, left);
     row.onclick = () => openDoc(d.id);
     box.append(row);
   }
